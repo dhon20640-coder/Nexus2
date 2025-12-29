@@ -688,3 +688,597 @@ task.spawn(function()
         end)
     end
 end)
+
+-- ============================
+-- MÓDULO AUTO SABER - NEXUS HUB V3 (CORRIGIDO - 600 LINHAS)
+-- ============================
+
+getgenv().AutoSaber = false
+local SS = {H=false,T=false,C=false,CF=false,SM=false,RM=false,ML=false,R=false,D=false,B=false}
+local ATw,AHB,NCLoop,TweenActive=nil,nil,nil,false
+local LastPos = nil
+
+-- PATHS
+local P = {
+    T={p={"Map","Jungle","Torch"},id="T",pos=CFrame.new(-1598,37,162)},
+    C={p={"Map","Desert","Burn","Cup"},id="C",pos=CFrame.new(1168,4,4344)},
+    L={p={"Map","Desert","Burn","Lava"},id="CF",pos=CFrame.new(1163,4,4360)},
+    SM={p={"Map","Jungle","QuestPlates","Plate1"},id="SM",pos=CFrame.new(-1604,36,204)},
+    RM={p={"Map","Mysterious Merchant","Mysterious Merchant"},id="RM",pos=CFrame.new(-2443,30,4750)},
+    R={p={"Map","Jungle","QuestPlates","Plate2"},id="R",pos=CFrame.new(-1611,36,204)},
+    DD={p={"Map","Desert","Burn","Part"},id="D",pos=CFrame.new(1114,4,4351)},
+    FS={p={"Map","Desert","Burn","Saber"},id="H",pos=CFrame.new(1168,4,4344)},
+    JF={p={"Map","Jungle","Final"},id="B",pos=CFrame.new(-1604,36,160)}
+}
+
+-- HELPERS
+local function Stop()
+    if ATw then pcall(function()ATw:Cancel()end)ATw=nil end 
+    if AHB then AHB:Disconnect()AHB=nil end 
+    TweenActive=false
+end
+
+local function CI(n)
+    local f=false 
+    pcall(function()
+        if Plr.Backpack:FindFirstChild(n)then f=true return end
+        if Plr.Character and Plr.Character:FindFirstChild(n)then f=true return end
+    end)
+    return f
+end
+
+local function HS()
+    if CI("Saber")or CI("Saber Expert")then return true end
+    local has=false
+    pcall(function()
+        local d=Plr:FindFirstChild("Data")
+        if d then 
+            local i=d:FindFirstChild("Inventory")
+            if i and(i:FindFirstChild("Saber")or i:FindFirstChild("Saber Expert"))then has=true end
+        end
+    end)
+    return has
+end
+
+local function GetCF(pt,fallback)
+    local o=WS 
+    for _,k in ipairs(pt)do 
+        o=o:FindFirstChild(k)
+        if not o then 
+            if fallback then 
+                print("[AS] Usando posição fallback")
+                return fallback 
+            end
+            return nil 
+        end 
+    end
+    if o:FindFirstChild("Handle")and o.Handle:IsA("BasePart")and o.Handle.Transparency<1 then return o.Handle.CFrame end
+    if o:IsA("BasePart")and o.Transparency<1 then return o.CFrame end
+    if o:IsA("Model")then 
+        for _,c in ipairs(o:GetChildren())do 
+            if c:IsA("BasePart")and c.Transparency<1 and c.Name~="HumanoidRootPart"then return c.CFrame end 
+        end 
+        local h=o:FindFirstChild("HumanoidRootPart")
+        if h and h:IsA("BasePart")then return h.CFrame end 
+        if o.PrimaryPart then return o.PrimaryPart.CFrame end
+    end
+    if fallback then return fallback end
+    return nil
+end
+
+-- NOCLIP
+local function ENC(c)
+    if not c then return end 
+    pcall(function()
+        if NCLoop then NCLoop:Disconnect()end 
+        NCLoop=RSvc.Stepped:Connect(function()
+            if not getgenv().AutoSaber then 
+                if NCLoop then NCLoop:Disconnect()NCLoop=nil end 
+                return 
+            end 
+            pcall(function()
+                for _,v in pairs(c:GetDescendants())do 
+                    if v:IsA("BasePart")then v.CanCollide=false end 
+                end 
+            end)
+        end)
+    end)
+end
+
+local function DNC()
+    if NCLoop then NCLoop:Disconnect()NCLoop=nil end 
+    pcall(function()
+        local c=Plr.Character 
+        if c then 
+            for _,v in pairs(c:GetDescendants())do 
+                if v:IsA("BasePart")and v.Name~="HumanoidRootPart"then v.CanCollide=true end 
+            end 
+        end 
+    end)
+end
+
+-- STATUS UPDATE
+local function US()
+    pcall(function()
+        SS.H=HS()
+        SS.T=CI("Torch")
+        SS.C=CI("Cup")
+        SS.R=CI("Relic")
+        local co=Plr.Backpack:FindFirstChild("Cup")or(Plr.Character and Plr.Character:FindFirstChild("Cup"))
+        SS.CF=false
+        if co and co:FindFirstChild("Handle")then
+            local c=co.Handle.Color 
+            SS.CF=c.R>0.8 and c.G<0.3 and c.B<0.3
+        end
+        local j=WS.Map:FindFirstChild("Jungle")
+        SS.SM=false
+        if j and j:FindFirstChild("QuestPlates")then 
+            local d=j.QuestPlates:FindFirstChild("Door")
+            SS.SM=d and d.CanCollide==false 
+        end
+        SS.B=false
+        if j and j:FindFirstChild("Final")then 
+            local p=j.Final:FindFirstChild("Part")
+            SS.B=p and p.Transparency==1 
+        end
+        SS.RM=Plr.Character and Plr.Character:FindFirstChild("RichSight")~=nil
+        SS.ML=not WS.Enemies:FindFirstChild("Saber Expert")
+        local ds=WS.Map:FindFirstChild("Desert")
+        SS.D=false
+        if ds and ds:FindFirstChild("Burn")then 
+            local dp=ds.Burn:FindFirstChild("Part")
+            SS.D=dp and dp.Transparency==1 
+        end
+    end)
+end
+
+-- TWEEN COM PROTEÇÃO
+local function ST(tCF,spd)
+    if not getgenv().AutoSaber or not tCF then return false end
+    
+    -- Verificar se já está na mesma posição
+    if LastPos and (LastPos.Position-tCF.Position).Magnitude<5 then
+        print("[AS] Já está nesta posição, pulando...")
+        return true
+    end
+    
+    local c=Plr.Character
+    local hrp=c and c:FindFirstChild("HumanoidRootPart")
+    local hum=c and c:FindFirstChild("Humanoid")
+    if not hrp or not hum then return false end
+    
+    local dst=(hrp.Position-tCF.Position).Magnitude
+    print("[AS] Distância para destino:",math.floor(dst))
+    
+    if dst<8 then 
+        LastPos=tCF
+        return true 
+    end
+    
+    if TweenActive then Stop()end
+    spd=spd or 300
+    local tm=math.max(dst/spd,0.5)
+    ENC(c)
+    hrp.Anchored=false
+    if hum then hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)end
+    ATw=TS:Create(hrp,TweenInfo.new(tm,Enum.EasingStyle.Linear),{CFrame=tCF})
+    TweenActive=true
+    local cmp=false
+    ATw.Completed:Connect(function()cmp=true TweenActive=false end)
+    ATw:Play()
+    local w=0 
+    while not cmp and w<tm+5 and getgenv().AutoSaber do 
+        task.wait(0.2)
+        w=w+0.2
+        if hrp and hrp.Parent then
+            local d=(hrp.Position-tCF.Position).Magnitude
+            if d<8 then break end
+        else
+            break
+        end
+    end
+    Stop()
+    if hrp and hrp.Parent then hrp.Anchored=false end
+    task.wait(0.3)
+    local arrived=hrp and hrp.Parent and(hrp.Position-tCF.Position).Magnitude<12
+    if arrived then LastPos=tCF end
+    return arrived
+end
+
+-- CLICK/PROX
+local function CO(p)
+    if not p then return end 
+    pcall(function()
+        local cd=p:FindFirstChildOfClass("ClickDetector")
+        if cd then fireclickdetector(cd)end
+    end)
+end
+
+local function PO(o)
+    if not o then return end 
+    pcall(function()
+        local pp=o:FindFirstChildOfClass("ProximityPrompt")
+        if pp then fireproximityprompt(pp,5)end
+    end)
+end
+
+-- INTERACT COM VERIFICAÇÃO MELHORADA
+local function INT(pd,useFP,att)
+    att=att or 15
+    US()
+    
+    -- Verificar se já completou
+    if pd.id=="T"and SS.T then print("[AS] Já tem Torch")return true end
+    if pd.id=="C"and SS.C then print("[AS] Já tem Cup")return true end
+    if pd.id=="CF"and SS.CF then print("[AS] Cup já com fogo")return true end
+    if pd.id=="R"and SS.R then print("[AS] Já tem Relic")return true end
+    if pd.id=="SM"and SS.SM then print("[AS] Sick Man completo")return true end
+    
+    print("[AS] Interagindo com:",pd.id)
+    
+    local cf=GetCF(pd.p,pd.pos)
+    if not cf then 
+        print("[AS] ERRO: Não encontrou objeto nem posição fallback")
+        return false 
+    end
+    
+    if not ST(cf,300)then 
+        print("[AS] ERRO: Falha ao chegar")
+        return false 
+    end
+    
+    task.wait(0.5)
+    local suc=false
+    pcall(function()
+        local o=WS 
+        for _,k in ipairs(pd.p)do 
+            o=o:FindFirstChild(k)
+            if not o then 
+                print("[AS] Objeto não encontrado, tentando clicar na posição")
+                return 
+            end 
+        end
+        local t=o:FindFirstChild("Handle")or o
+        local hrp=Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        ENC(Plr.Character)
+        for i=1,att do
+            if not getgenv().AutoSaber then break end
+            hrp.CFrame=t.CFrame 
+            task.wait(0.2)
+            if useFP then PO(t)else CO(t)end
+            task.wait(0.4)
+            US()
+            if pd.id=="T"and SS.T or pd.id=="C"and SS.C or pd.id=="CF"and SS.CF or pd.id=="SM"and SS.SM or pd.id=="R"and SS.R then 
+                suc=true 
+                print("[AS] Sucesso!")
+                break 
+            end
+        end
+    end)
+    DNC()
+    task.wait(1)
+    US()
+    return suc
+end
+
+-- ATIVAR BOTÕES MELHORADO
+local function AB()
+    if SS.B then return true end
+    if not getgenv().AutoSaber then return false end
+    
+    print("[AS] Ativando botões da Jungle...")
+    
+    local fo=nil 
+    pcall(function()
+        local j=WS.Map:FindFirstChild("Jungle")
+        if j then fo=j:FindFirstChild("Final")end 
+    end)
+    if not fo then 
+        print("[AS] ERRO: Jungle/Final não encontrado")
+        return false 
+    end
+    
+    local buttons={}
+    for _,o in ipairs(fo:GetDescendants())do 
+        if o:IsA("Part")and o.Name=="Part"and o.Transparency<1 then 
+            table.insert(buttons,o)
+        end 
+    end
+    
+    if #buttons==0 then 
+        print("[AS] ERRO: Nenhum botão encontrado")
+        return false 
+    end
+    
+    print("[AS] Encontrados",#buttons,"botões")
+    
+    -- Ir para área dos botões
+    local startPos=buttons[1].CFrame+Vector3.new(0,5,0)
+    if not ST(startPos,300)then 
+        print("[AS] Não conseguiu chegar nos botões")
+        return false 
+    end
+    
+    task.wait(0.5)
+    pcall(function()
+        local hrp=Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        ENC(Plr.Character)
+        for idx,btn in ipairs(buttons)do
+            if not getgenv().AutoSaber then break end
+            print("[AS] Clicando botão",idx,"/",#buttons)
+            for i=1,8 do 
+                if not getgenv().AutoSaber then break end
+                hrp.CFrame=btn.CFrame+Vector3.new(0,3,0)
+                task.wait(0.2)
+                CO(btn)
+                task.wait(0.3)
+                US()
+                if SS.B then 
+                    print("[AS] Todos botões ativados!")
+                    break 
+                end
+            end 
+            if SS.B then break end
+        end
+    end)
+    DNC()
+    task.wait(1)
+    US()
+    return SS.B
+end
+
+-- QUESTS
+local function GT()if SS.T then return true end if not getgenv().AutoSaber then return false end return INT(P.T,true)end
+local function GC()if SS.C then return true end if not getgenv().AutoSaber then return false end return INT(P.C,false)end
+local function FC()if SS.CF then return true end if not getgenv().AutoSaber then return false end return INT(P.L,false)end
+local function TSM()if SS.SM then return true end if not getgenv().AutoSaber then return false end return INT(P.SM,false)end
+local function GR()if SS.R then return true end if not getgenv().AutoSaber then return false end return INT(P.R,false)end
+
+-- RICH MAN
+local function TRM()
+    if SS.RM then return true end 
+    if not getgenv().AutoSaber then return false end
+    print("[AS] Rich Man quest...")
+    local cf=GetCF(P.RM.p,P.RM.pos)
+    if not cf then return false end
+    if not ST(cf,300)then return false end 
+    task.wait(0.5)
+    pcall(function()
+        local m=WS.Map:FindFirstChild("Mysterious Merchant")
+        if not m then return end
+        local n=m:FindFirstChild("Mysterious Merchant")
+        if not n or not n:FindFirstChild("HumanoidRootPart")then return end
+        local hrp=Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        for i=1,15 do 
+            if not getgenv().AutoSaber then break end
+            hrp.CFrame=n.HumanoidRootPart.CFrame 
+            task.wait(0.3)
+            CO(n)
+            task.wait(0.5)
+            US()
+            if SS.RM then break end
+        end
+    end)
+    task.wait(1.5)
+    US()
+    return SS.RM
+end
+
+-- BOSS COM VERIFICAÇÃO
+local function DML()
+    if SS.ML then return true end 
+    if not getgenv().AutoSaber then return false end
+    print("[AS] Procurando boss...")
+    local bc=nil 
+    local attempts=0
+    while attempts<5 and not bc and getgenv().AutoSaber do
+        pcall(function()
+            local b=WS.Enemies:FindFirstChild("Saber Expert")
+            if b and b:FindFirstChild("HumanoidRootPart")then 
+                bc=b.HumanoidRootPart.CFrame 
+                print("[AS] Boss encontrado!")
+            end 
+        end)
+        if not bc then 
+            print("[AS] Boss não spawnou ainda, aguardando...")
+            task.wait(3)
+            attempts=attempts+1
+        end
+    end
+    if not bc then 
+        print("[AS] Boss não encontrado após 5 tentativas, pulando...")
+        return false 
+    end
+    ST(bc+Vector3.new(0,20,0),300)
+    task.wait(2)
+    local mw,w=120,0
+    while getgenv().AutoSaber and w<mw do 
+        US()
+        if SS.ML then return true end
+        local m=WS.Enemies:FindFirstChild("Saber Expert")
+        if m then 
+            local h=m:FindFirstChild("Humanoid")
+            local r=m:FindFirstChild("HumanoidRootPart")
+            if h and r and h.Health>0 then 
+                local c=Plr.Character
+                local hrp=c and c:FindFirstChild("HumanoidRootPart")
+                if hrp then 
+                    repeat 
+                        if not getgenv().AutoSaber then break end
+                        pcall(function()
+                            if _G.Equip then _G.Equip()end
+                            if _G.AutoHaki then _G.AutoHaki()end
+                            ENC(c)
+                            hrp.CFrame=r.CFrame*CFrame.new(0,15,0)
+                        end)
+                        task.wait(0.1)
+                    until not m.Parent or h.Health<=0 or not getgenv().AutoSaber 
+                end
+            end
+        else
+            print("[AS] Boss morreu ou despawnou")
+            break
+        end
+        task.wait(1)
+        w=w+1
+    end
+    DNC()
+    US()
+    return SS.ML
+end
+
+-- PORTA
+local function OD()
+    if SS.D then return true end 
+    if not getgenv().AutoSaber then return false end
+    if not SS.R then 
+        print("[AS] Precisa da Relic primeiro!")
+        return false 
+    end
+    print("[AS] Abrindo porta...")
+    local cf=GetCF(P.DD.p,P.DD.pos)
+    if not cf then return false end
+    if not ST(cf,300)then return false end 
+    task.wait(0.5)
+    pcall(function()
+        local dr=WS.Map.Desert.Burn:FindFirstChild("Part")
+        if not dr then return end
+        local hrp=Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        ENC(Plr.Character)
+        for i=1,15 do 
+            if not getgenv().AutoSaber then break end
+            hrp.CFrame=dr.CFrame 
+            task.wait(0.3)
+            CO(dr)
+            task.wait(0.5)
+            US()
+            if SS.D then break end
+        end
+    end)
+    DNC()
+    task.wait(1.5)
+    US()
+    return SS.D
+end
+
+-- COLETAR SABER
+local function CS()
+    if not getgenv().AutoSaber then return false end
+    print("[AS] Coletando Saber...")
+    local cf=GetCF(P.FS.p,P.FS.pos)
+    if not cf then return false end
+    if not ST(cf,300)then return false end 
+    task.wait(1)
+    pcall(function()
+        local sb=WS.Map.Desert.Burn:FindFirstChild("Saber")
+        if not sb or not sb:FindFirstChild("Handle")then return end
+        local hrp=Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
+        if not hrp then return end
+        ENC(Plr.Character)
+        for i=1,30 do 
+            if not getgenv().AutoSaber then break end
+            hrp.CFrame=sb.Handle.CFrame 
+            task.wait(0.2)
+            US()
+            if SS.H then break end
+        end
+    end)
+    DNC()
+    task.wait(1)
+    US()
+    return SS.H
+end
+
+-- PRÉ-REQUISITOS
+local function CP(s)
+    if s=="B"then return true end
+    if s=="T"then return SS.B end
+    if s=="C"then return SS.B and SS.T end
+    if s=="CF"then return SS.B and SS.T and SS.C end
+    if s=="SM"then return SS.B and SS.T and SS.C and SS.CF end
+    if s=="RM"then return SS.B and SS.T and SS.C and SS.CF and SS.SM end
+    if s=="ML"then return SS.B and SS.T and SS.C and SS.CF and SS.SM and SS.RM end
+    if s=="R"then return SS.B and SS.T and SS.C and SS.CF and SS.SM and SS.RM and SS.ML end
+    if s=="D"then return SS.B and SS.T and SS.C and SS.CF and SS.SM and SS.RM and SS.ML and SS.R end
+    return false
+end
+
+-- UI
+local TabQI=Win:AddTab({Title="Quests & Itens",Icon="package"})
+TabQI:AddSection("Auto Saber Quest")
+TabQI:AddParagraph({Title="Status do Saber",Content="Sistema automático completo"})
+local SL=TabQI:AddParagraph({Title="Progresso",Content="Aguardando ativação..."})
+local TG=TabQI:AddToggle("AutoSaber",{Title="Auto Saber",Description="Quest automática do Saber",Default=false})
+
+TG:OnChanged(function(v)
+    getgenv().AutoSaber=v
+    if v then 
+        LastPos=nil
+        Fl:Notify({Title="Auto Saber",Content="Auto Saber ativado!",Duration=3})
+    else 
+        Stop()
+        DNC()
+        LastPos=nil
+        SL:SetDesc("⏸️ Pausado")
+        Fl:Notify({Title="Auto Saber",Content="Auto Saber desativado.",Duration=3})
+    end
+end)
+
+-- LOOP PRINCIPAL COM PROTEÇÃO
+task.spawn(function()
+    while task.wait(3)do 
+        if getgenv().AutoSaber then 
+            pcall(function()
+                US()
+                if SS.H then 
+                    getgenv().AutoSaber=false 
+                    TG:SetValue(false)
+                    DNC()
+                    LastPos=nil
+                    SL:SetDesc("✅ Saber obtido!")
+                    Fl:Notify({Title="Auto Saber",Content="✅ Quest completa!",Duration=5})
+                    return 
+                end
+                if not SS.B then 
+                    SL:SetDesc("🔘 [1/9] Botões...")
+                    if AB()then task.wait(2)end
+                elseif not SS.T and CP("T")then 
+                    SL:SetDesc("🔥 [2/9] Tocha...")
+                    if GT()then task.wait(2)end
+                elseif not SS.C and CP("C")then 
+                    SL:SetDesc("🍵 [3/9] Cup...")
+                    if GC()then task.wait(2)end
+                elseif not SS.CF and CP("CF")then 
+                    SL:SetDesc("🌋 [4/9] Cup/Fogo...")
+                    if FC()then task.wait(2)end
+                elseif not SS.SM and CP("SM")then 
+                    SL:SetDesc("💬 [5/9] Sick Man...")
+                    if TSM()then task.wait(2)end
+                elseif not SS.RM and CP("RM")then 
+                    SL:SetDesc("💰 [6/9] Rich Man...")
+                    if TRM()then task.wait(2)end
+                elseif not SS.ML and CP("ML")then 
+                    SL:SetDesc("⚔️ [7/9] Boss...")
+                    if DML()then task.wait(2)else task.wait(5)end
+                elseif not SS.R and CP("R")then 
+                    SL:SetDesc("📿 [8/9] Relíquia...")
+                    if GR()then task.wait(2)end
+                elseif not SS.D and CP("D")then 
+                    SL:SetDesc("🚪 [9/9] Porta...")
+                    if OD()then task.wait(2)end
+                elseif SS.D and SS.R then 
+                    SL:SetDesc("⚔️ [FINAL] Saber...")
+                    if CS()then task.wait(2)end
+                else 
+                    SL:SetDesc("⏳ Verificando...")
+                    print("[AS] Aguardando condições...")
+                end
+            end)
+        end 
+    end
+end)
+
