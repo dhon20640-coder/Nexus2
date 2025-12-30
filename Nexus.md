@@ -1281,4 +1281,470 @@ task.spawn(function()
         end 
     end
 end)
+-- ============================
+-- MÓDULO AUTO SEA 2 - NEXUS HUB V3
+-- Cole abaixo do módulo Auto Saber
+-- ============================
 
+getgenv().AutoSea2 = false
+local QuestStep = 1
+local BossDefeated = false
+
+local function Notify(text)
+    Fl:Notify({Title="Auto Sea 2", Content=text, Duration=5})
+end
+
+-- Verificar se Boss está vivo/spawned
+local function IsBossAlive()
+    local alive = false
+    pcall(function()
+        local boss = WS.Enemies:FindFirstChild("Ice Admiral")
+        if boss then
+            local humanoid = boss:FindFirstChild("Humanoid")
+            if humanoid and humanoid.Health > 0 then
+                alive = true
+            end
+        end
+    end)
+    return alive
+end
+
+-- Verificar se a porta já está aberta
+local function IsDoorOpen()
+    local isOpen = false
+    pcall(function()
+        local door = WS.Map:FindFirstChild("Ice")
+        if door then door = door:FindFirstChild("Door") end
+        
+        if door then
+            isOpen = door.Transparency == 1 or not door.CanCollide
+        end
+    end)
+    return isOpen
+end
+
+-- Verificar se Boss já foi derrotado ou não existe mais
+local function CheckBossStatus()
+    return not IsBossAlive()
+end
+
+-- Sistema de verificação de progresso ao iniciar
+local BossNotifiedOnce = false
+
+local function VerifyProgress()
+    pcall(function()
+        -- Se a porta já está aberta
+        if IsDoorOpen() then
+            print("[Auto Sea 2] Porta já está aberta!")
+            
+            -- Verifica se o boss está vivo
+            if IsBossAlive() then
+                print("[Auto Sea 2] Boss está vivo! Indo direto para ele...")
+                QuestStep = 3  -- Vai direto para derrotar o boss
+                Notify("⏭️ Porta aberta detectada! Indo pro boss...")
+            elseif CheckBossStatus() then
+                -- Boss não existe/morto
+                if not BossNotifiedOnce then
+                    Notify("⚠️ Boss não está spawnado! Aguardando...")
+                    BossNotifiedOnce = true
+                end
+                print("[Auto Sea 2] Boss não spawnou ainda, aguardando...")
+                QuestStep = 3  -- Fica no step 3 esperando boss spawnar
+            end
+        -- Se não tem chave mas porta fechada
+        elseif not HasKey() then
+            QuestStep = 1
+            print("[Auto Sea 2] Iniciando do zero...")
+        -- Se tem chave mas porta fechada
+        elseif HasKey() then
+            QuestStep = 2
+            Notify("⏭️ Chave detectada! Indo abrir a porta...")
+            print("[Auto Sea 2] Chave encontrada, indo para a porta...")
+        end
+    end)
+end
+
+local function CheckLevel()
+    local level = 0
+    pcall(function()
+        if Plr:FindFirstChild("Data") and Plr.Data:FindFirstChild("Level") then
+            level = Plr.Data.Level.Value
+        elseif Plr:FindFirstChild("Level") then
+            level = Plr.Level.Value
+        elseif Plr:FindFirstChild("leaderstats") and Plr.leaderstats:FindFirstChild("Level") then
+            level = Plr.leaderstats.Level.Value
+        end
+    end)
+    return level >= 700
+end
+
+local function HasKey()
+    local ok, r = pcall(function()
+        return Plr.Backpack:FindFirstChild("Key") or (Plr.Character and Plr.Character:FindFirstChild("Key"))
+    end)
+    return ok and r ~= nil
+end
+
+-- Tween com Heartbeat suave (300 speed)
+local function SmoothTween(targetCF)
+    if not getgenv().AutoSea2 or not targetCF then return false end
+    
+    local Character = Plr.Character
+    if not Character then return false end
+    
+    local HRP = Character:FindFirstChild("HumanoidRootPart")
+    local Hum = Character:FindFirstChild("Humanoid")
+    if not HRP or not Hum then return false end
+    
+    local distance = (HRP.Position - targetCF.Position).Magnitude
+    if distance < 5 then return true end
+    
+    local speed = 300
+    local duration = distance / speed
+    
+    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
+    local tween = TS:Create(HRP, tweenInfo, {CFrame = targetCF})
+    
+    -- NoClip com Heartbeat suave
+    local connection
+    connection = RSvc.Heartbeat:Connect(function()
+        if not getgenv().AutoSea2 then
+            if connection then connection:Disconnect() end
+            return
+        end
+        pcall(function()
+            HRP.AssemblyLinearVelocity = Vector3.new()
+            for _, v in pairs(Character:GetDescendants()) do
+                if v:IsA("BasePart") then
+                    v.CanCollide = false
+                end
+            end
+        end)
+    end)
+    
+    tween:Play()
+    tween.Completed:Wait()
+    
+    if connection then connection:Disconnect() end
+    task.wait(0.3)
+    return getgenv().AutoSea2
+end
+
+-- Interagir com NPC (Tween suave + Conversa automática SEM abrir diálogo + FIXO na frente)
+local function TalkToNPC(npcName, position)
+    if not SmoothTween(position) then return false end
+    
+    local success = false
+    for i = 1, 8 do  -- Reduzido de 15 para 8 tentativas
+        if not getgenv().AutoSea2 then break end
+        
+        pcall(function()
+            local npc = WS.NPCs:FindFirstChild(npcName)
+            if npc and npc:FindFirstChild("HumanoidRootPart") then
+                local HRP = Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
+                if HRP then
+                    -- Fica FIXO na frente do NPC (não fica indo pra trás)
+                    local npcCF = npc.HumanoidRootPart.CFrame
+                    local frontPosition = npcCF * CFrame.new(0, 0, -3)
+                    HRP.CFrame = frontPosition
+                    task.wait(0.1)
+                    
+                    -- Interage automaticamente SEM abrir caixas de diálogo
+                    if CF then
+                        -- Fecha qualquer diálogo aberto
+                        pcall(function()
+                            local gui = Plr.PlayerGui:FindFirstChild("Main")
+                            if gui then
+                                local dialog = gui:FindFirstChild("DialogueContainer")
+                                if dialog then
+                                    dialog.Visible = false
+                                end
+                            end
+                        end)
+                        
+                        -- Invoca servidor para conversar automaticamente
+                        CF:InvokeServer("StartQuest")
+                        CF:InvokeServer("ProQuestProgress", "Mission")
+                    end
+                    
+                    -- ClickDetector como backup
+                    local clickDetector = npc:FindFirstChildOfClass("ClickDetector")
+                    if clickDetector then
+                        fireclickdetector(clickDetector)
+                    end
+                    
+                    if npcName == "Military Detective" and HasKey() then
+                        success = true
+                    end
+                end
+            end
+        end)
+        
+        if success then break end
+        task.wait(1)  -- Reduzido de 0.3 para 1 segundo
+    end
+    
+    return success or HasKey()
+end
+
+-- Equipar chave e abrir porta
+local function OpenDoor(doorPosition)
+    if not HasKey() then return false end
+    
+    -- Equipar chave
+    pcall(function()
+        local key = Plr.Backpack:FindFirstChild("Key")
+        if key and Plr.Character then
+            local humanoid = Plr.Character:FindFirstChild("Humanoid")
+            if humanoid then
+                humanoid:EquipTool(key)
+            end
+        end
+    end)
+    
+    if not SmoothTween(doorPosition) then return false end
+    
+    for i = 1, 15 do
+        if not getgenv().AutoSea2 then break end
+        
+        pcall(function()
+            local door = WS.Map:FindFirstChild("Ice")
+            if door then door = door:FindFirstChild("Door") end
+            
+            if door then
+                local HRP = Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
+                if HRP then
+                    HRP.CFrame = door.CFrame
+                    task.wait(0.2)
+                    
+                    local clickDetector = door:FindFirstChildOfClass("ClickDetector")
+                    if clickDetector then
+                        fireclickdetector(clickDetector)
+                    end
+                end
+            end
+        end)
+        
+        task.wait(0.3)
+    end
+    
+    return true
+end
+
+-- Farm Boss usando RegisterHit e RegisterAttack do Nexus
+local function FarmBoss(spawnPosition)
+    if not SmoothTween(spawnPosition) then return false end
+    task.wait(1)
+    
+    local maxTime = 180
+    local elapsed = 0
+    local bossNotifyShown = false
+    
+    while getgenv().AutoSea2 and elapsed < maxTime do
+        local boss = WS.Enemies:FindFirstChild("Ice Admiral")
+        
+        if boss then
+            local humanoid = boss:FindFirstChild("Humanoid")
+            local bossHRP = boss:FindFirstChild("HumanoidRootPart")
+            local bossHead = boss:FindFirstChild("Head")
+            
+            if humanoid and bossHRP and humanoid.Health > 0 then
+                local Character = Plr.Character
+                local HRP = Character and Character:FindFirstChild("HumanoidRootPart")
+                
+                if HRP then
+                    -- Reset notificação quando boss spawnar
+                    if not bossNotifyShown then
+                        print("[Auto Sea 2] Boss detectado! Iniciando ataque...")
+                        bossNotifyShown = true
+                    end
+                    
+                    -- Heartbeat para manter fixo no ar (estilo Auto Farm Nexus)
+                    local farmConnection
+                    farmConnection = RSvc.Heartbeat:Connect(function()
+                        if not boss.Parent or humanoid.Health <= 0 or not getgenv().AutoSea2 then
+                            if farmConnection then farmConnection:Disconnect() end
+                            return
+                        end
+                        
+                        pcall(function()
+                            -- Ativa Haki e Equipa arma
+                            AutoHaki()
+                            Equip()
+                            
+                            -- Mantém fixo acima do boss
+                            HRP.CFrame = bossHRP.CFrame * CFrame.new(0, 20, 15)
+                            HRP.AssemblyLinearVelocity = Vector3.new()
+                            
+                            -- NoClip
+                            for _, v in pairs(Character:GetDescendants()) do
+                                if v:IsA("BasePart") then
+                                    v.CanCollide = false
+                                end
+                            end
+                            
+                            -- Usa RegisterAttack e RegisterHit do Nexus
+                            if RA and RH and bossHead then
+                                local targets = {{boss, bossHead}}
+                                RA:FireServer(0.1)
+                                RH:FireServer(bossHead, targets)
+                            end
+                        end)
+                    end)
+                    
+                    -- Aguarda boss morrer
+                    while boss.Parent and humanoid.Health > 0 and getgenv().AutoSea2 do
+                        task.wait(0.1)
+                    end
+                    
+                    if farmConnection then farmConnection:Disconnect() end
+                    
+                    if humanoid.Health <= 0 then
+                        BossDefeated = true
+                        return true
+                    end
+                end
+            end
+        else
+            -- Boss não existe ainda
+            if not BossNotifiedOnce then
+                Notify("⚠️ Boss não está spawnado! Aguardando...")
+                BossNotifiedOnce = true
+                print("[Auto Sea 2] Aguardando boss spawnar...")
+            end
+        end
+        
+        task.wait(2)
+        elapsed = elapsed + 2
+    end
+    
+    return BossDefeated
+end
+
+-- Sequência da Quest
+local function StartSea2Quest()
+    if not getgenv().AutoSea2 then return end
+    
+    if not CheckLevel() then
+        Notify("❌ Você precisa de Level 700+!")
+        getgenv().AutoSea2 = false
+        Sea2Toggle:SetValue(false)
+        return
+    end
+    
+    -- Verifica se porta já está aberta durante execução
+    if QuestStep <= 2 and IsDoorOpen() then
+        print("[Auto Sea 2] Porta aberta detectada! Pulando para boss...")
+        QuestStep = 3
+    end
+    
+    -- Passo 1: Military Detective (APENAS se não tiver chave E porta fechada)
+    if QuestStep == 1 then
+        if not HasKey() and not IsDoorOpen() then
+            Notify("🔑 Indo ao Military Detective...")
+            if TalkToNPC("Military Detective", CFrame.new(5084.8, 5.68, 743.2)) then
+                Notify("✅ Chave obtida!")
+                task.wait(1)
+                QuestStep = 2
+            end
+        else
+            QuestStep = 2
+        end
+        return
+    end
+    
+    -- Passo 2: Abrir porta (APENAS se porta estiver fechada)
+    if QuestStep == 2 then
+        if IsDoorOpen() then
+            Notify("⏭️ Porta já está aberta! Indo pro boss...")
+            QuestStep = 3
+            return
+        end
+        
+        Notify("🚪 Abrindo porta na Ice Cave...")
+        if OpenDoor(CFrame.new(1266.5, 9.0, -1245.1)) then
+            Notify("✅ Porta aberta!")
+            task.wait(1)
+            QuestStep = 3
+        end
+        return
+    end
+    
+    -- Passo 3: Derrotar Ice Admiral
+    if QuestStep == 3 then
+        -- Se boss já foi derrotado, pula
+        if CheckBossStatus() and BossDefeated then
+            QuestStep = 4
+            return
+        end
+        
+        Notify("⚔️ Indo para o Ice Admiral...")
+        if FarmBoss(CFrame.new(1316.7, 26.9, -1338.1)) then
+            Notify("✅ Boss derrotado!")
+            BossNotifiedOnce = false
+            task.wait(2)
+            QuestStep = 4
+        end
+        return
+    end
+    
+    -- Passo 4: Retornar ao Military Detective
+    if QuestStep == 4 then
+        Notify("🔙 Voltando ao Military Detective...")
+        if TalkToNPC("Military Detective", CFrame.new(5084.8, 5.68, 743.2)) then
+            task.wait(2)
+            QuestStep = 5
+        end
+        return
+    end
+    
+    -- Passo 5: Experienced Captain (CIDADE CENTRAL SEA 1)
+    if QuestStep == 5 then
+        Notify("✅ Indo para Cidade Central finalizar...")
+        print("[Auto Sea 2] Indo para cidade central (Middle Town)...")
+        
+        -- POSIÇÃO CORRETA: Cidade Central (Middle Town) no Sea 1
+        local middleTownPos = CFrame.new(-4913.5, 717.7, -2622.8)
+        
+        if TalkToNPC("Experienced Captain", middleTownPos) then
+            task.wait(2)
+            Notify("🎉 Quest do Second Sea completa!")
+            getgenv().AutoSea2 = false
+            QuestStep = 6
+        end
+        return
+    end
+end
+
+-- TOGGLE
+local Sea2Toggle = TabQI:AddToggle("AutoSea2", {
+    Title = "Auto Sea 2",
+    Description = "lvl 700+",
+    Default = false
+})
+
+Sea2Toggle:OnChanged(function(value)
+    getgenv().AutoSea2 = value
+    if value then
+        QuestStep = 1
+        BossDefeated = false
+        BossNotifiedOnce = false
+        
+        -- Verifica o progresso ao ativar
+        VerifyProgress()
+        
+        Notify("✅ Auto Sea 2 ativado!")
+        print("[Auto Sea 2] Sistema iniciado! Step atual:", QuestStep)
+    else
+        Notify("⏸️ Auto Sea 2 desativado")
+    end
+end)
+
+-- Loop Principal
+task.spawn(function()
+    while task.wait(1) do
+        if getgenv().AutoSea2 then
+            pcall(StartSea2Quest)
+        end
+    end
+end)
