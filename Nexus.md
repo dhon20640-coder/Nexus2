@@ -103,236 +103,74 @@ end
 
 -- expõe o módulo globalmente pra outros scripts do executor
 getgenv().QuestIlha = QuestIlha
-
--- Nexus Hub V3 Delta (Farm fix + Auto Collect Fruits + TweenFollow25) USANDO MÓDULO QuestIlha
 wait(1)
 local PS=game:GetService("Players");local RS=game:GetService("ReplicatedStorage");local WS=game:GetService("Workspace")
 local TS=game:GetService("TweenService");local VU=game:GetService("VirtualUser");local LT=game:GetService("Lighting")
 local RSvc=game:GetService("RunService")
 local Plr=PS.LocalPlayer;repeat task.wait() until Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart");task.wait(2)
 local Remotes=RS:WaitForChild("Remotes",5);local CF=Remotes:FindFirstChild("CommF_")
+local QuestIlha=getgenv().QuestIlha
 
--- ========= MÓDULO QUESTILHA CARREGADO POR OUTRO SCRIPT =========
--- Certifique-se de ter rodado antes um script que faça:  getgenv().QuestIlha = { ... }
-local QuestIlha = getgenv().QuestIlha
-
-getgenv().AF=false getgenv().AK=false getgenv().AB=false
-getgenv().AS=false getgenv().SA="Melee" getgenv().SP=1
-getgenv().AR=false getgenv().SR="Human" getgenv().WP="Melee"
-getgenv().BM=false getgenv().ACF=false
+getgenv().AF=false getgenv().AK=false getgenv().AB=false getgenv().AS=false getgenv().SA="Melee" getgenv().SP=1
+getgenv().AR=false getgenv().SR="Human" getgenv().WP="Melee" getgenv().BM=true getgenv().BringMode=350 getgenv().AC=false
 
 Plr.Idled:Connect(function()VU:CaptureController();VU:ClickButton2(Vector2.new())end)
 
--- ======= FUNÇÕES DE LEVEL / SEA / QUEST (agora usando QuestIlha) =======
 local function GL()local ok,v=pcall(function()return Plr.Data.Level.Value end)return ok and v or 1 end
-
-local function GS()
-local hrp=Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart");if not hrp then return 1 end
-local x,z=hrp.Position.X,hrp.Position.Z
-if x>=-2000 and x<=2000 and z>=-2000 and z<=2000 then return 1
-elseif x>2000 and x<=5000 and z>=-1000 and z<=5000 then return 2
-elseif x<-2000 or x>5000 or z<-2000 or z>5000 then return 3 else return 1 end
-end
-
-local function GQ()
-    if not QuestIlha or not QuestIlha.GetQuestForLevel then return nil end
-    return QuestIlha.GetQuestForLevel(GL())
-end
-
+local function GS()local hrp=Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart");if not hrp then return 1 end;local x,z=hrp.Position.X,hrp.Position.Z;if x>=-2000 and x<=2000 and z>=-2000 and z<=2000 then return 1 elseif x>2000 and x<=5000 and z>=-1000 and z<=5000 then return 2 elseif x<-2000 or x>5000 or z<-2000 or z>5000 then return 3 else return 1 end end
+local function GQ()if not QuestIlha or not QuestIlha.GetQuestForLevel then return nil end;local q=QuestIlha.GetQuestForLevel(GL());if not q then return nil end;local qSea=q.Sea or 1;local pSea=GS();if qSea>pSea then local altQ=QuestIlha.GetLastQuestForSea and QuestIlha.GetLastQuestForSea(pSea);return altQ or q end;return q end
 local function HQ()local ok,v=pcall(function()return Plr.PlayerGui.Main.Quest.Visible end)return ok and v end
+local function IsFarmActive()return getgenv().AF or getgenv().AK or getgenv().AB end
+local function SetNoclipLight(char,enable)if not char then return end;for _,p in ipairs(char:GetDescendants())do if p:IsA("BasePart")then if p.Name=="HumanoidRootPart"or p.Name=="UpperTorso"or p.Name=="LowerTorso"or p.Name=="Torso"then p.CanCollide=not enable end end end end
+local function RestoreNormalPhysics()pcall(function()local c=Plr.Character;if not c then return end;local hrp=c:FindFirstChild("HumanoidRootPart");local hum=c:FindFirstChild("Humanoid");if not hrp or not hum then return end;SetNoclipLight(c,false);hrp.Anchored=false;hrp.AssemblyLinearVelocity=Vector3.new();hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics);task.wait(0.1);hum:ChangeState(Enum.HumanoidStateType.Freefall)end)end
 
--- Noclip leve
-local function SetNoclipLight(char,enable)
-if not char then return end
-for _,p in ipairs(char:GetDescendants())do
-if p:IsA("BasePart")then
-if p.Name=="HumanoidRootPart" or p.Name=="UpperTorso" or p.Name=="LowerTorso" or p.Name=="Torso" then
-p.CanCollide=not enable
-end
-end
-end
-end
+local function ApplyFarmPhysics()if not IsFarmActive()then return end;local c=Plr.Character;local hrp=c and c:FindFirstChild("HumanoidRootPart");local hum=c and c:FindFirstChild("Humanoid");if not c or not hrp or not hum then return end;SetNoclipLight(c,true);hrp.Anchored=false;hrp.AssemblyLinearVelocity=Vector3.new();hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)end
 
--- Anti Rollback
-local Traveling=false IslandTravel=false
-local function ApplyFarmPhysics()
-local c=Plr.Character;local hrp=c and c:FindFirstChild("HumanoidRootPart");local hum=c and c:FindFirstChild("Humanoid")
-if not c or not hrp or not hum then return end
-SetNoclipLight(c,true)
-hrp.Anchored=false
-hrp.AssemblyLinearVelocity=Vector3.new()
-hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
-end
+local function InMyNetWork(o)if isnetworkowner then return isnetworkowner(o)end;local c=Plr.Character;if not c or not c:FindFirstChild("HumanoidRootPart")then return false end;return(o.Position-c.HumanoidRootPart.Position).Magnitude<=getgenv().BringMode end
 
-function TCF(cf)
-local c=Plr.Character;local hrp=c and c:FindFirstChild("HumanoidRootPart");if not hrp or not cf then return end
-local targetPos=cf.Position;if IslandTravel then targetPos=targetPos+Vector3.new(0,25,0)end
-local d=(hrp.Position-targetPos).Magnitude;if d<1 then return end
-Traveling=true;SetNoclipLight(c,true);hrp.Anchored=false;hrp.AssemblyLinearVelocity=Vector3.new()
-local spd=250;local dur=d/spd
-local info=TweenInfo.new(dur,Enum.EasingStyle.Linear,Enum.EasingDirection.InOut)
-local goal={CFrame=CFrame.new(targetPos,hrp.Position+hrp.CFrame.LookVector)}
-local tw=TS:Create(hrp,info,goal);local hb
-hb=RSvc.Heartbeat:Connect(function()
-if not Traveling or not hrp or not hrp.Parent then return end
-hrp.Anchored=false
-hrp.AssemblyLinearVelocity=Vector3.new()
-end)
-tw.Completed:Connect(function()
-Traveling=false;if hb then hb:Disconnect()end
-if hrp and hrp.Parent then hrp.Anchored=false;hrp.AssemblyLinearVelocity=Vector3.new()end
-ApplyFarmPhysics()
-end)
-tw:Play()
-task.wait(dur+0.1)
-Traveling=false
-if hb then hb:Disconnect()end
-ApplyFarmPhysics()
-end
+local function BringMobs(n,playerPos)if not getgenv().BM then return 0 end;local c=Plr.Character;if not c or not c:FindFirstChild("HumanoidRootPart")then return 0 end;local h=c.HumanoidRootPart;local t=playerPos or h.CFrame*CFrame.new(0,-20,0);local b=0;local m=2;for _,e in pairs(WS.Enemies:GetChildren())do if b>=m then break end;if e.Name==n and e:FindFirstChild("Humanoid")and e:FindFirstChild("HumanoidRootPart")and e.Humanoid.Health>0 then local d=(e.HumanoidRootPart.Position-h.Position).Magnitude;if d<=getgenv().BringMode then if InMyNetWork(e.HumanoidRootPart)then pcall(function()e.HumanoidRootPart.CFrame=t;e.HumanoidRootPart.CanCollide=false;e.HumanoidRootPart.Size=Vector3.new(50,50,50);e.Head.CanCollide=false;e.Humanoid.WalkSpeed=0;e.Humanoid.JumpPower=0;e.Humanoid:ChangeState(14);e.Humanoid:ChangeState(11);if e.Humanoid:FindFirstChild("Animator")then e.Humanoid.Animator:Destroy()end;b=b+1 end)end end end end;if sethiddenproperty then pcall(function()sethiddenproperty(Plr,"SimulationRadius",math.huge)end)end;return b end
 
-function TIsland(cf)IslandTravel=true;TCF(cf);IslandTravel=false end
-function TMob(cf)IslandTravel=false;TCF(cf)end
-
--- utils
-local function Equip()pcall(function()
-local c=Plr.Character;if not c or not c:FindFirstChild("Humanoid")then return end
-local bp,tool=Plr.Backpack
-if getgenv().WP=="Sword"then
-for _,v in ipairs(bp:GetChildren())do
-if v:IsA("Tool")and(v.ToolTip=="Sword"or v.Name:find("Katana")or v.Name:find("Blade"))then tool=v break end
-end
-end
-if not tool then tool=bp:FindFirstChild("Combat")end
-if tool then c.Humanoid:EquipTool(tool)end
-end)end
-
-local function FM(n)
-local nm,dist=nil,9e9
-pcall(function()
-local c=Plr.Character;local hrp=c and c:FindFirstChild("HumanoidRootPart");if not hrp then return end
-for _,m in ipairs(WS.Enemies:GetChildren())do
-if m.Name==n then
-local h=m:FindFirstChild("Humanoid");local r=m:FindFirstChild("HumanoidRootPart")
-if h and r and h.Health>0 then
-local d=(hrp.Position-r.Position).Magnitude
-if d<dist then dist,nm=d,m end
-end
-end
-end
-end)
-return nm
-end
-
+local function Equip()pcall(function()local c=Plr.Character;if not c or not c:FindFirstChild("Humanoid")then return end;local bp,tool=Plr.Backpack;if getgenv().WP=="Sword"then for _,v in ipairs(bp:GetChildren())do if v:IsA("Tool")and(v.ToolTip=="Sword"or v.Name:find("Katana")or v.Name:find("Blade"))then tool=v break end end end;if not tool then tool=bp:FindFirstChild("Combat")end;if tool then c.Humanoid:EquipTool(tool)end end)end
+local function FM(n)local nm,dist=nil,9e9;pcall(function()local c=Plr.Character;local hrp=c and c:FindFirstChild("HumanoidRootPart");if not hrp then return end;for _,m in ipairs(WS.Enemies:GetChildren())do if m.Name==n then local h=m:FindFirstChild("Humanoid");local r=m:FindFirstChild("HumanoidRootPart");if h and r and h.Health>0 then local d=(hrp.Position-r.Position).Magnitude;if d<dist then dist,nm=d,m end end end end end)return nm end
 local function GR()local ok,v=pcall(function()return Plr.Data.Race.Value end)return ok and v or"Unknown"end
 local function GF()local ok,v=pcall(function()return Plr.Data.Fragments.Value end)return ok and v or 0 end
 local function RR()if GF()<3000 or not CF then return false end;local ok=pcall(function()CF:InvokeServer("BlackbeardReward","Reroll","2")end)return ok end
+local function FP()pcall(function()LT.GlobalShadows=false;LT.FogEnd=9e9;settings().Rendering.QualityLevel=Enum.QualityLevel.Level01;for _,v in ipairs(WS:GetDescendants())do if v:IsA("BasePart")or v:IsA("UnionOperation")or v:IsA("MeshPart")then v.Material=Enum.Material.Plastic;v.Reflectance=0 elseif v:IsA("Decal")or v:IsA("Texture")then v.Transparency=1 elseif v:IsA("ParticleEmitter")or v:IsA("Trail")then v.Lifetime=NumberRange.new(0)elseif v:IsA("Fire")or v:IsA("SpotLight")or v:IsA("Smoke")or v:IsA("Sparkles")then v.Enabled=false end end end)end
+local function AutoHaki()pcall(function()local c=Plr.Character;if not c then return end;if c:FindFirstChild("Buso Haki")or c:FindFirstChild("Enhancement")then return end;local VIM=game:GetService("VirtualInputManager");VIM:SendKeyEvent(true,"J",false,game);task.wait(0.05);VIM:SendKeyEvent(false,"J",false,game)end)end
 
-local function FP()pcall(function()
-LT.GlobalShadows=false;LT.FogEnd=9e9;settings().Rendering.QualityLevel=Enum.QualityLevel.Level01
-for _,v in ipairs(WS:GetDescendants())do
-if v:IsA("BasePart")or v:IsA("UnionOperation")or v:IsA("MeshPart")then v.Material=Enum.Material.Plastic;v.Reflectance=0
-elseif v:IsA("Decal")or v:IsA("Texture")then v.Transparency=1
-elseif v:IsA("ParticleEmitter")or v:IsA("Trail")then v.Lifetime=NumberRange.new(0)
-elseif v:IsA("Fire")or v:IsA("SpotLight")or v:IsA("Smoke")or v:IsA("Sparkles")then v.Enabled=false end
-end
-end)end
+local ActiveTween=nil;local FollowHB=nil;local GroundTween=nil
+local function TweenFollow25(hrp,targetHRP,speed)if not hrp or not targetHRP then return end;speed=speed or 300;local yOffset=25;if ActiveTween then ActiveTween:Cancel();ActiveTween=nil end;if FollowHB then FollowHB:Disconnect();FollowHB=nil end;local targetCF=targetHRP.CFrame*CFrame.new(0,yOffset,0);local distance=(hrp.Position-targetCF.Position).Magnitude;local time=math.max(distance/speed,0.05);ActiveTween=TS:Create(hrp,TweenInfo.new(time,Enum.EasingStyle.Linear),{CFrame=targetCF});ActiveTween:Play();ActiveTween.Completed:Once(function()FollowHB=RSvc.Heartbeat:Connect(function()if not targetHRP or not targetHRP.Parent or not IsFarmActive()then FollowHB:Disconnect();FollowHB=nil;return end;hrp.CFrame=targetHRP.CFrame*CFrame.new(0,yOffset,0)end)end)end
 
-local function AutoHaki()pcall(function()
-local c=Plr.Character;if not c then return end
-if c:FindFirstChild("Buso Haki")or c:FindFirstChild("Enhancement")then return end
-local VIM=game:GetService("VirtualInputManager")
-VIM:SendKeyEvent(true,"J",false,game);task.wait(0.05);VIM:SendKeyEvent(false,"J",false,game)
-end)end
-
-local function HasNet(p)local ok,o=pcall(function()return p:GetNetworkOwner()end)return ok and(o==Plr or o==nil)end
-
-local function BMob(name,center)
-if not getgenv().BM or not center then return end
-local c=Plr.Character;local hrp=c and c:FindFirstChild("HumanoidRootPart");if not hrp then return end
-local list={}
-for _,m in ipairs(WS.Enemies:GetChildren())do
-if m.Name==name then
-local h=m:FindFirstChild("Humanoid");local r=m:FindFirstChild("HumanoidRootPart")
-if h and r and h.Health>0 and HasNet(r)then
-local d=(r.Position-hrp.Position).Magnitude
-if d<=20 then table.insert(list,{mob=m,root=r,hum=h,dist=d})end
-end
-end
-end
-table.sort(list,function(a,b)return a.dist<b.dist end)
-for i=1,math.min(2,#list)do
-local data=list[i];local m=data.mob;local r=data.root;local h=data.hum
-r.CFrame=CFrame.new(center.Position+Vector3.new(0,-25,0));h.JumpPower=0;h.WalkSpeed=0
-r.Transparency=1;r.CanCollide=false;local head=m:FindFirstChild("Head");if head then head.CanCollide=false end
-local an=h:FindFirstChild("Animator");if an then an:Destroy()end
-if not r:FindFirstChild("Lock")then
-local bv=Instance.new("BodyVelocity");bv.Name="Lock";bv.MaxForce=Vector3.new(1e5,1e5,1e5);bv.Velocity=Vector3.new();bv.Parent=r
-end
-sethiddenproperty(Plr,"SimulationRadius",math.huge);h:ChangeState(11)
-end
-end
-
--- FRUTAS
-local FruitNames={"Bomb-Bomb","Spike-Spike","Chop-Chop","Spring-Spring","Kilo-Kilo","Smoke-Smoke","Flame-Flame","Ice-Ice","Sand-Sand","Dark-Dark","Ghost-Ghost","Magma-Magma","Quake-Quake","Buddha-Buddha","Love-Love","Spider-Spider","Phoenix-Phoenix","Portal-Portal","Rumble-Rumble","Pain-Pain","Blizzard-Blizzard","Gravity-Gravity","Dough-Dough","Shadow-Shadow","Venom-Venom","Control-Control","Spirit-Spirit","Dragon-Dragon","Leopard-Leopard"}
-local FruitSet={}for _,n in ipairs(FruitNames)do FruitSet[n]=true end
-
-local function IsFruitModel(m)
-if not m or not m:IsA("Model")then return false end
-if FruitSet[m.Name]then return true end
-return m.Name:find("Fruit")~=nil
-end
-
-local function GetNearestFruit()
-local my=Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart");if not my then return end
-local best,dist=nil,1e9
-for _,m in ipairs(WS:GetChildren())do
-if IsFruitModel(m)then
-local p=m:FindFirstChildWhichIsA("BasePart")
-if p then
-local d=(p.Position-my.Position).Magnitude
-if d<dist then dist,best=d,p end
-end
-end
-end
-return best
-end
-
-local function AnyFruit()
-for _,m in ipairs(WS:GetChildren())do
-if IsFruitModel(m)then return true end
-end
-return false
-end
-
--- TWEEN FOLLOW 25 (suave no mob)
-local ActiveTween=nil
-local FollowHB=nil
-local function TweenFollow25(hrp,targetHRP,speed)
-    if not hrp or not targetHRP then return end
-    speed=speed or 300
-    local yOffset=25
-
-    if ActiveTween then ActiveTween:Cancel();ActiveTween=nil end
-    if FollowHB then FollowHB:Disconnect();FollowHB=nil end
-
-    local targetCF=targetHRP.CFrame*CFrame.new(0,yOffset,0)
+local function TweenToGround(hrp,targetCF,speed)
+    if not hrp then return end
+    speed=speed or 250
+    if GroundTween then 
+        GroundTween:Cancel()
+        GroundTween=nil 
+    end
     local distance=(hrp.Position-targetCF.Position).Magnitude
-    local time=math.max(distance/speed,0.05)
-
-    ActiveTween=TS:Create(hrp,TweenInfo.new(time,Enum.EasingStyle.Linear),{CFrame=targetCF})
-    ActiveTween:Play()
-
-    ActiveTween.Completed:Once(function()
-        FollowHB=RSvc.Heartbeat:Connect(function()
-            if not targetHRP or not targetHRP.Parent then
-                FollowHB:Disconnect();FollowHB=nil;return
-            end
-            hrp.CFrame=targetHRP.CFrame*CFrame.new(0,yOffset,0)
-        end)
-    end)
+    local time=math.max(distance/speed,0.1)
+    GroundTween=TS:Create(hrp,TweenInfo.new(time,Enum.EasingStyle.Linear),{CFrame=targetCF})
+    GroundTween:Play()
+    GroundTween.Completed:Wait()
+    GroundTween=nil
 end
 
--- UI Fluent
+local function StopAllTweens()
+    if ActiveTween then 
+        ActiveTween:Cancel()
+        ActiveTween=nil 
+    end
+    if FollowHB then 
+        FollowHB:Disconnect()
+        FollowHB=nil 
+    end
+    if GroundTween then
+        GroundTween:Cancel()
+        GroundTween=nil
+    end
+end
+
 local Fl=loadstring(game:HttpGet("https://github.com/dawid-scripts/Fluent/releases/latest/download/main.lua"))()
 local Win=Fl:CreateWindow({Title="Nexus Hub V3",SubTitle="Blox Fruits Delta",TabWidth=160,Size=UDim2.fromOffset(580,460),Theme="Darker"})
 local TabM=Win:AddTab({Title="Main",Icon="home"});local TabS=Win:AddTab({Title="Shop",Icon="shopping-bag"})
@@ -342,199 +180,48 @@ local TabSe=Win:AddTab({Title="Settings",Icon="settings"})
 TabM:AddParagraph({Title="Nexus Hub V3",Content="Versao Estavel Delta"})
 TabM:AddButton({Title="Discord",Description="Copiar link",Callback=function()setclipboard("https://discord.gg/29BDQqHYbJ")end})
 
+TabS:AddSection("Shop")
 TabS:AddButton({Title="Comprar Haki",Description="25k Beli",Callback=function()if CF then CF:InvokeServer("BuyHaki","Buso")end end})
 TabS:AddButton({Title="Comprar Race",Description="3k Frags (1x)",Callback=function()RR()end})
-TabS:AddDropdown("RaceSel",{Title="Selecionar Race",Values={"Human","Mink","Shark","Angel"},Default=1})
-:OnChanged(function(v)getgenv().SR=v end)
+TabS:AddDropdown("RaceSel",{Title="Selecionar Race",Values={"Human","Mink","Shark","Angel"},Default=1}):OnChanged(function(v)getgenv().SR=v end)
 local TG_AR=TabS:AddToggle("AutoR",{Title="Auto Reroll Race",Description="Para ao conseguir",Default=false})
 TG_AR:OnChanged(function(v)getgenv().AR=v end)
 
-TabF:AddDropdown("Weap",{Title="Weapon Style",Values={"Melee","Sword"},Default=1})
-:OnChanged(function(v)getgenv().WP=v end)
-TabF:AddToggle("AF",{Title="Auto Farm Level",Description="0-2800",Default=false})
-:OnChanged(function(v)getgenv().AF=v;if v then getgenv().AK=false getgenv().AB=false end end)
+TabF:AddSection("Farming")
+TabF:AddDropdown("Weap",{Title="Weapon Style",Values={"Melee","Sword"},Default=1}):OnChanged(function(v)getgenv().WP=v end)
+TabF:AddToggle("AF",{Title="Auto Farm Level",Description="0-2800",Default=false}):OnChanged(function(v)getgenv().AF=v;if v then getgenv().AK=false getgenv().AB=false else RestoreNormalPhysics()end end)
 local TG_AK=TabF:AddToggle("AK",{Title="Auto Katakuri",Description="Sea3 Lv1500+",Default=false})
-TG_AK:OnChanged(function(v)
-if v and(GL()<1500 or GS()~=3)then TG_AK:SetValue(false);return end
-getgenv().AK=v;if v then getgenv().AF=false getgenv().AB=false end
-end)
+TG_AK:OnChanged(function(v)if v and(GL()<1500 or GS()~=3)then TG_AK:SetValue(false);return end;getgenv().AK=v;if v then getgenv().AF=false getgenv().AB=false else RestoreNormalPhysics()end end)
 local TG_AB=TabF:AddToggle("AB",{Title="Auto Bone",Description="Sea3 Lv1500+",Default=false})
-TG_AB:OnChanged(function(v)
-if v and(GL()<1500 or GS()~=3)then TG_AB:SetValue(false);return end
-getgenv().AB=v;if v then getgenv().AF=false getgenv().AK=false end
-end)
-TabF:AddToggle("BM",{Title="Bring Mob (2)",Description="Puxa 2 NPC prox.",Default=false})
-:OnChanged(function(v)getgenv().BM=v end)
-TabF:AddToggle("ACF_T",{Title="Auto Collect Fruits",Description="Pega frutas físicas",Default=false})
-:OnChanged(function(v)getgenv().ACF=v end)
+TG_AB:OnChanged(function(v)if v and(GL()<1500 or GS()~=3)then TG_AB:SetValue(false);return end;getgenv().AB=v;if v then getgenv().AF=false getgenv().AK=false else RestoreNormalPhysics()end end)
 
-TabSt:AddSlider("Pts",{Title="Pontos por Upgrade",Default=1,Min=1,Max=100,Rounding=0})
-:OnChanged(function(v)getgenv().SP=v end)
-TabSt:AddDropdown("Stat",{Title="Selecionar Status",Values={"Melee","Defense","Sword","Gun","Blox Fruit"},Default=1})
-:OnChanged(function(v)local m={Melee="Melee",Defense="Defense",Sword="Sword",Gun="Gun",["Blox Fruit"]="Fruit"};getgenv().SA=m[v]end)
-TabSt:AddToggle("AS",{Title="Auto Status",Default=false})
-:OnChanged(function(v)getgenv().AS=v end)
+TabSt:AddSlider("Pts",{Title="Pontos por Upgrade",Default=1,Min=1,Max=100,Rounding=0}):OnChanged(function(v)getgenv().SP=v end)
+TabSt:AddDropdown("Stat",{Title="Selecionar Status",Values={"Melee","Defense","Sword","Gun","Blox Fruit"},Default=1}):OnChanged(function(v)local m={Melee="Melee",Defense="Defense",Sword="Sword",Gun="Gun",["Blox Fruit"]="Fruit"};getgenv().SA=m[v]end)
+TabSt:AddToggle("AS",{Title="Auto Status",Default=false}):OnChanged(function(v)getgenv().AS=v end)
 
+TabSe:AddSection("Server HOP")
 TabSe:AddButton({Title="Rejoin",Description="Reconectar",Callback=function()game:GetService("TeleportService"):Teleport(game.PlaceId,Plr)end})
-TabSe:AddButton({Title="Hop Server",Description="Poucos players",Callback=function()
-task.spawn(function()pcall(function()
-local HS=game:GetService("HttpService");local TS2=game:GetService("TeleportService");local srvs={}
-local ok,res=pcall(function()return game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100")end)
-if ok then local d=HS:JsonDecode(res);if d and d.data then
-for _,s in ipairs(d.data)do if s.playing and s.playing>=1 and s.playing<=8 and s.id~=game.JobId then table.insert(srvs,s.id)end end
-end end
-if #srvs>0 then TS2:TeleportToPlaceInstance(game.PlaceId,srvs[math.random(1,#srvs)],Plr)else TS2:Teleport(game.PlaceId,Plr)end
-end)end)
-end})
+TabSe:AddButton({Title="Hop Server",Description="Poucos players",Callback=function()task.spawn(function()pcall(function()local HS=game:GetService("HttpService");local TS2=game:GetService("TeleportService");local srvs={};local ok,res=pcall(function()return game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100")end);if ok then local d=HS:JSONDecode(res);if d and d.data then for _,s in ipairs(d.data)do if s.playing and s.playing>=1 and s.playing<=8 and s.id~=game.JobId then table.insert(srvs,s.id)end end end end;if #srvs>0 then TS2:TeleportToPlaceInstance(game.PlaceId,srvs[math.random(1,#srvs)],Plr)else TS2:Teleport(game.PlaceId,Plr)end end)end)end})
 TabSe:AddButton({Title="FPS Boost",Description="Tirar Lag",Callback=FP})
+TabSe:AddSection("Settings Farming")
+TabSe:AddToggle("BM",{Title="Bring Mob (2)",Description="Puxa 2 NPC prox.",Default=true}):OnChanged(function(v)getgenv().BM=v end)
+TabSe:AddToggle("AC",{Title="Auto Click",Default=false}):OnChanged(function(v)getgenv().AC=v end)
 
 local SG=Instance.new("ScreenGui");SG.Name="NexusToggle";SG.ResetOnSpawn=false;SG.Parent=Plr:WaitForChild("PlayerGui")
-local BTN=Instance.new("TextButton");BTN.Size=UDim2.fromOffset(60,60);BTN.Position=UDim2.new(0,20,0,20)
-BTN.BackgroundColor3=Color3.fromRGB(25,25,35);BTN.Text="N";BTN.TextColor3=Color3.fromRGB(255,165,0)
-BTN.TextSize=18;BTN.Font=Enum.Font.GothamBold;BTN.Parent=SG
-local UIC=Instance.new("UICorner");UIC.CornerRadius=UDim.new(0,12);UIC.Parent=BTN
-local UIS=Instance.new("UIStroke");UIS.Color=Color3.fromRGB(255,165,0);UIS.Thickness=2;UIS.Parent=BTN
+local BTN=Instance.new("TextButton");BTN.Size=UDim2.fromOffset(60,60);BTN.Position=UDim2.new(0,20,0,20);BTN.BackgroundColor3=Color3.fromRGB(25,25,35);BTN.Text="N";BTN.TextColor3=Color3.fromRGB(255,165,0);BTN.TextSize=18;BTN.Font=Enum.Font.GothamBold;BTN.Parent=SG
+local UIC=Instance.new("UICorner");UIC.CornerRadius=UDim.new(0,12);UIC.Parent=BTN;local UIS=Instance.new("UIStroke");UIS.Color=Color3.fromRGB(255,165,0);UIS.Thickness=2;UIS.Parent=BTN
 BTN.MouseButton1Click:Connect(function()Win.Root.Visible=not Win.Root.Visible end)
 
--- fast attack
-local RA,RH;task.spawn(function()
-task.wait(2);pcall(function()
-local M=RS:WaitForChild("Modules",5);if M then local N=M:FindFirstChild("Net");if N then RA=N:FindFirstChild("RE/RegisterAttack");RH=N:FindFirstChild("RE/RegisterHit")end end
-end)
-end)
+local RA,RH;task.spawn(function()task.wait(2);pcall(function()local M=RS:WaitForChild("Modules",5);if M then local N=M:FindFirstChild("Net");if N then RA=N:FindFirstChild("RE/RegisterAttack");RH=N:FindFirstChild("RE/RegisterHit")end end end)end)
 
-task.spawn(function()
-while task.wait(0.1)do
-if(getgenv().AF or getgenv().AK or getgenv().AB)and RA and RH and not Traveling then
-pcall(function()
-local tgts,tName={},nil
-for _,m in ipairs(WS.Enemies:GetChildren())do
-if m:FindFirstChild("Head")then
-if getgenv().AF then local q=GQ();if q and m.Name==(q.M or q.Mon) then table.insert(tgts,{m,m.Head});tName=(q.M or q.Mon) end
-elseif getgenv().AK and GS()==3 then
-if m.Name=="Cookie Crafter"or m.Name=="Cake Guard"or m.Name=="Baking Staff"or m.Name=="Head Baker"then table.insert(tgts,{m,m.Head});tName=m.Name end
-elseif getgenv().AB and GS()==3 then
-if m.Name=="Reborn Skeleton"or m.Name=="Living Zombie"or m.Name=="Demonic Soul"or m.Name=="Posessed Mummy"then table.insert(tgts,{m,m.Head});tName=m.Name end
-end
-end
-end
-if #tgts>0 then
-local c=Plr.Character;local hrp=c and c:FindFirstChild("HumanoidRootPart")
-if hrp and getgenv().BM and tName then BMob(tName,hrp.CFrame)end
-RA:FireServer(0.1);RH:FireServer(tgts[1][2],tgts)
-end
-end)
-end
-end
-end)
+task.spawn(function()while task.wait(0.1)do if(getgenv().AF or getgenv().AK or getgenv().AB)and RA and RH then pcall(function()local tgts,tName={},nil;for _,m in ipairs(WS.Enemies:GetChildren())do if m:FindFirstChild("Head")and m:FindFirstChild("Humanoid")and m.Humanoid.Health>0 then if getgenv().AF then local q=GQ();if q and m.Name==(q.M or q.Mon)then table.insert(tgts,{m,m.Head});tName=(q.M or q.Mon)end elseif getgenv().AK and GS()==3 then if m.Name=="Cookie Crafter"or m.Name=="Cake Guard"or m.Name=="Baking Staff"or m.Name=="Head Baker"then table.insert(tgts,{m,m.Head});tName=m.Name end elseif getgenv().AB and GS()==3 then if m.Name=="Reborn Skeleton"or m.Name=="Living Zombie"or m.Name=="Demonic Soul"or m.Name=="Posessed Mummy"then table.insert(tgts,{m,m.Head});tName=m.Name end end end end;if #tgts>0 then local c=Plr.Character;local hrp=c and c:FindFirstChild("HumanoidRootPart");if hrp and tName then local targetMob=tgts[1][1];if targetMob and targetMob:FindFirstChild("HumanoidRootPart")then local dist=(hrp.Position-targetMob.HumanoidRootPart.Position).Magnitude;if dist<=50 then BringMobs(tName,hrp.CFrame*CFrame.new(0,-20,0))end end end;RA:FireServer(0.1);RH:FireServer(tgts[1][2],tgts)end end)end end end)
 
--- main farm com TweenFollow25 (agora lendo QuestIlha via GQ)
-task.spawn(function()
-while task.wait(0.1)do
-pcall(function()
-local c=Plr.Character;if not c then return end
-local hrp=c:FindFirstChild("HumanoidRootPart");local hum=c:FindFirstChild("Humanoid")
-if not hrp or not hum then return end
-SetNoclipLight(c,true)
-hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)
-hrp.AssemblyLinearVelocity=Vector3.new()
+task.spawn(function()while task.wait(0.1)do if getgenv().AC and RA and RH then pcall(function()local c=Plr.Character;local hrp=c and c:FindFirstChild("HumanoidRootPart");if not hrp then return end;local tgts={};for _,m in ipairs(WS.Enemies:GetChildren())do if m:FindFirstChild("Head")and m:FindFirstChild("Humanoid")and m.Humanoid.Health>0 and m:FindFirstChild("HumanoidRootPart")then local dist=(hrp.Position-m.HumanoidRootPart.Position).Magnitude;if dist<=50 then table.insert(tgts,{m,m.Head})end end end;for _,p in ipairs(PS:GetPlayers())do if p~=Plr and p.Character and p.Character:FindFirstChild("Head")and p.Character:FindFirstChild("Humanoid")and p.Character.Humanoid.Health>0 and p.Character:FindFirstChild("HumanoidRootPart")then local dist=(hrp.Position-p.Character.HumanoidRootPart.Position).Magnitude;if dist<=50 then table.insert(tgts,{p.Character,p.Character.Head})end end end;if #tgts>0 then RA:FireServer(0.1);RH:FireServer(tgts[1][2],tgts)end end)end end end)
 
-local function farmFlag(flag,mobSingle,listNames)
-if not getgenv()[flag] then return end
-AutoHaki();Equip()
-local tm
-if listNames then for _,n in ipairs(listNames)do tm=FM(n);if tm then break end end else tm=mobSingle end
-if not tm or not getgenv()[flag] then return end
-local h=tm:FindFirstChild("Humanoid");local r=tm:FindFirstChild("HumanoidRootPart")
-if not h or not r or h.Health<=0 then return end
+task.spawn(function()while task.wait(0.1)do pcall(function()local c=Plr.Character;if not c then return end;local hrp=c:FindFirstChild("HumanoidRootPart");local hum=c:FindFirstChild("Humanoid");if not hrp or not hum then return end;if hum.Health<=0 and IsFarmActive()then StopAllTweens();repeat task.wait()until Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")and Plr.Character:FindFirstChild("Humanoid")and Plr.Character.Humanoid.Health>0;c=Plr.Character;hrp=c.HumanoidRootPart;hum=c.Humanoid;task.wait(1)end;local function farmFlag(flag,mobSingle,listNames)if not getgenv()[flag]then StopAllTweens();return end;AutoHaki();Equip();local tm;if listNames then for _,n in ipairs(listNames)do tm=FM(n);if tm then break end end else tm=mobSingle end;if tm then local h=tm:FindFirstChild("Humanoid");local r=tm:FindFirstChild("HumanoidRootPart");if h and r and h.Health>0 then SetNoclipLight(c,true);hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics);TweenFollow25(hrp,r,300);while tm.Parent and h.Health>0 and getgenv()[flag]and hum.Health>0 do hrp.AssemblyLinearVelocity=Vector3.new();Equip();task.wait(0.05)end;StopAllTweens()end else StopAllTweens()end end;if IsFarmActive()then local hasMob=false;if getgenv().AF then local q=GQ();if q then local mobName=q.M or q.Mon;if FM(mobName)then hasMob=true end end elseif getgenv().AK and GS()==3 then for _,n in ipairs({"Cookie Crafter","Cake Guard","Baking Staff","Head Baker"})do if FM(n)then hasMob=true break end end elseif getgenv().AB and GS()==3 then for _,n in ipairs({"Reborn Skeleton","Living Zombie","Demonic Soul","Posessed Mummy"})do if FM(n)then hasMob=true break end end end;if not hasMob then StopAllTweens();SetNoclipLight(c,false);hrp.Anchored=false;hrp.AssemblyLinearVelocity=Vector3.new();hrp.AssemblyAngularVelocity=Vector3.new();if hrp.Position.Y>15 then local ray=Ray.new(hrp.Position,Vector3.new(0,-1000,0));local hit,pos=WS:FindPartOnRay(ray,c);if hit then local targetY=pos.Y+5;local groundCF=CFrame.new(hrp.Position.X,targetY,hrp.Position.Z);TweenToGround(hrp,groundCF,250);task.wait(0.3)end end;hum:ChangeState(Enum.HumanoidStateType.Freefall);task.wait(0.5);hrp.AssemblyLinearVelocity=Vector3.new();hrp.AssemblyAngularVelocity=Vector3.new()else SetNoclipLight(c,true);hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics);hrp.AssemblyLinearVelocity=Vector3.new()end else StopAllTweens();SetNoclipLight(c,false);hrp.Anchored=false end;if getgenv().AF then local q=GQ();if not q then return end;local questCF=q.QC or q.CFrameQuest;local mobSpawnCF=q.SC or q.CFrameMon;local questName=q.N or q.NameQuest;local questLevel=q.L or q.LevelQuest;local mobName=q.M or q.Mon;if not HQ()and CF then CF:InvokeServer("StartQuest",questName,questLevel);task.wait(0.2)end;local m=FM(mobName);if m and getgenv().AF then farmFlag("AF",m)else StopAllTweens();local spawnY=(mobSpawnCF.Position.Y>0)and mobSpawnCF.Position.Y or 50;local spawnCF=CFrame.new(mobSpawnCF.Position.X,spawnY,mobSpawnCF.Position.Z);TweenToGround(hrp,spawnCF,250);task.wait(0.5)end elseif getgenv().AK then if GS()==3 and GL()>=1500 then farmFlag("AK",nil,{"Cookie Crafter","Cake Guard","Baking Staff","Head Baker"})else getgenv().AK=false;TG_AK:SetValue(false);StopAllTweens()end elseif getgenv().AB then if GS()==3 and GL()>=1500 then farmFlag("AB",nil,{"Reborn Skeleton","Living Zombie","Demonic Soul","Posessed Mummy"})else getgenv().AB=false;TG_AB:SetValue(false);StopAllTweens()end end end)end end)
 
-TweenFollow25(hrp,r,300)
-
-while tm.Parent and h.Health>0 and getgenv()[flag] do
-    hrp.AssemblyLinearVelocity=Vector3.new()
-    Equip();task.wait(0.05)
-end
-end
-
-if getgenv().AF then
-local q=GQ()
-if not q then return end
-local questCF=q.QC or q.CFrameQuest
-local mobSpawnCF=q.SC or q.CFrameMon
-local questName=q.N or q.NameQuest
-local questLevel=q.L or q.LevelQuest
-local mobName=q.M or q.Mon
-
-if not HQ() then
-TIsland(questCF);task.wait(2)
-if CF then CF:InvokeServer("StartQuest",questName,questLevel)end
-task.wait(1)
-end
-local m=FM(mobName)
-if m and HQ() then farmFlag("AF",m)else TIsland(mobSpawnCF);task.wait(1.5)end
-elseif getgenv().AK then
-if GS()==3 and GL()>=1500 then
-farmFlag("AK",nil,{"Cookie Crafter","Cake Guard","Baking Staff","Head Baker"})
-else getgenv().AK=false;TG_AK:SetValue(false)end
-elseif getgenv().AB then
-if GS()==3 and GL()>=1500 then
-farmFlag("AB",nil,{"Reborn Skeleton","Living Zombie","Demonic Soul","Posessed Mummy"})
-else getgenv().AB=false;TG_AB:SetValue(false)end
-end
-end)
-end
-end)
-
--- Auto Collect Fruits
-task.spawn(function()
-while task.wait(0.4)do
-pcall(function()
-if not getgenv().ACF then return end
-if not AnyFruit() then return end
-
-local wasAF,wasAK,wasAB=getgenv().AF,getgenv().AK,getgenv().AB
-getgenv().AF=false getgenv().AK=false getgenv().AB=false
-
-while AnyFruit() and getgenv().ACF do
-    local fruitPart=GetNearestFruit()
-    if not fruitPart then break end
-    local c=Plr.Character;local hrp=c and c:FindFirstChild("HumanoidRootPart")
-    if not hrp then break end
-    IslandTravel=true;TCF(fruitPart.CFrame);IslandTravel=false
-    local t0=time()
-    while time()-t0<6 do
-        if not fruitPart.Parent then break end
-        hrp.CFrame=fruitPart.CFrame
-        task.wait(0.15)
-    end
-end
-
-if getgenv().ACF then
-    getgenv().AF, getgenv().AK, getgenv().AB = wasAF,wasAK,wasAB
-end
-end)
-end
-end)
-
--- auto status / race
-task.spawn(function()
-while task.wait(1)do
-if getgenv().AS and getgenv().SA and CF then
-pcall(function()CF:InvokeServer("AddPoint",getgenv().SA,getgenv().SP)end)
-end
-end
-end)
-
-task.spawn(function()
-while task.wait(3)do
-if getgenv().AR and CF then
-pcall(function()
-if GR()==getgenv().SR then getgenv().AR=false;TG_AR:SetValue(false);return end
-local ok=RR();if not ok then getgenv().AR=false;TG_AR:SetValue(false)end
-end)
-end
-end
-end)
+task.spawn(function()while task.wait(1)do if getgenv().AS and getgenv().SA and CF then pcall(function()CF:InvokeServer("AddPoint",getgenv().SA,getgenv().SP)end)end end end)
+task.spawn(function()while task.wait(3)do if getgenv().AR and CF then pcall(function()if GR()==getgenv().SR then getgenv().AR=false;TG_AR:SetValue(false);return end;local ok=RR();if not ok then getgenv().AR=false;TG_AR:SetValue(false)end end)end end end)
 
 Fl:Notify({Title="Nexus Hub V3",Content="Carregado! Sea: "..GS().." | Lv: "..GL(),Duration=5})
 -- ESP Player & Fruits + Auto Collect Fruits (MÓDULO SEPARADO)
@@ -688,516 +375,298 @@ task.spawn(function()
         end)
     end
 end)
-
 -- ============================
--- MÓDULO AUTO SABER - NEXUS HUB V3 (CORRIGIDO - 600 LINHAS)
+-- MÓDULO AUTO SABER - NEXUS HUB V3 (CORRIGIDO SEQUÊNCIA)
 -- ============================
 
 getgenv().AutoSaber = false
 local SS = {H=false,T=false,C=false,CF=false,SM=false,RM=false,ML=false,R=false,D=false,B=false}
-local ATw,AHB,NCLoop,TweenActive=nil,nil,nil,false
-local LastPos = nil
+local ATw,AHB,NCLoop=nil,nil,nil
 
--- PATHS
-local P = {
-    T={p={"Map","Jungle","Torch"},id="T",pos=CFrame.new(-1598,37,162)},
-    C={p={"Map","Desert","Burn","Cup"},id="C",pos=CFrame.new(1168,4,4344)},
-    L={p={"Map","Desert","Burn","Lava"},id="CF",pos=CFrame.new(1163,4,4360)},
-    SM={p={"Map","Jungle","QuestPlates","Plate1"},id="SM",pos=CFrame.new(-1604,36,204)},
-    RM={p={"Map","Mysterious Merchant","Mysterious Merchant"},id="RM",pos=CFrame.new(-2443,30,4750)},
-    R={p={"Map","Jungle","QuestPlates","Plate2"},id="R",pos=CFrame.new(-1611,36,204)},
-    DD={p={"Map","Desert","Burn","Part"},id="D",pos=CFrame.new(1114,4,4351)},
-    FS={p={"Map","Desert","Burn","Saber"},id="H",pos=CFrame.new(1168,4,4344)},
-    JF={p={"Map","Jungle","Final"},id="B",pos=CFrame.new(-1604,36,160)}
+-- PATHS DOS OBJETOS
+local PATHS = {
+    Torch = {"Map","Jungle","Torch"},
+    TorchToDesert = {"Map","Desert","Burn","Cup"}, -- Tocha vai pro deserto
+    Cup = {"Map","Desert","Burn","Cup"},
+    Lava = {"Map","Desert","Burn","Lava"},
+    SickMan = {"Map","Jungle","QuestPlates","Plate1"},
+    RichMan = {"Map","Mysterious Merchant","Mysterious Merchant"},
+    Relic = {"Map","Jungle","QuestPlates","Plate2"},
+    RelicToDesert = {"Map","Desert","Burn","Part"}, -- Relíquia vai pra porta
+    DesertDoor = {"Map","Desert","Burn","Part"},
+    FinalSaber = {"Map","Desert","Burn","Saber"},
+    JungleFinal = {"Map","Jungle","Final"}
 }
 
--- HELPERS
+-- FUNÇÕES AUXILIARES
 local function Stop()
-    if ATw then pcall(function()ATw:Cancel()end)ATw=nil end 
-    if AHB then AHB:Disconnect()AHB=nil end 
-    TweenActive=false
+    if ATw then ATw:Cancel()ATw=nil end
+    if AHB then AHB:Disconnect()AHB=nil end
+    if NCLoop then NCLoop:Disconnect()NCLoop=nil end
 end
 
 local function CI(n)
-    local f=false 
-    pcall(function()
-        if Plr.Backpack:FindFirstChild(n)then f=true return end
-        if Plr.Character and Plr.Character:FindFirstChild(n)then f=true return end
-    end)
-    return f
+    local ok,r=pcall(function()return Plr.Backpack:FindFirstChild(n)or(Plr.Character and Plr.Character:FindFirstChild(n))end)
+    return ok and r~=nil
 end
 
-local function HS()
-    if CI("Saber")or CI("Saber Expert")then return true end
-    local has=false
-    pcall(function()
-        local d=Plr:FindFirstChild("Data")
-        if d then 
-            local i=d:FindFirstChild("Inventory")
-            if i and(i:FindFirstChild("Saber")or i:FindFirstChild("Saber Expert"))then has=true end
-        end
-    end)
-    return has
-end
+local function HS()return CI("Saber")or CI("Saber Expert")end
 
-local function GetCF(pt,fallback)
-    local o=WS 
-    for _,k in ipairs(pt)do 
-        o=o:FindFirstChild(k)
-        if not o then 
-            if fallback then 
-                print("[AS] Usando posição fallback")
-                return fallback 
-            end
-            return nil 
-        end 
+local function GetCF(pathTable)
+    local obj = WS
+    for _, key in ipairs(pathTable) do
+        obj = obj:FindFirstChild(key)
+        if not obj then return nil end
     end
-    if o:FindFirstChild("Handle")and o.Handle:IsA("BasePart")and o.Handle.Transparency<1 then return o.Handle.CFrame end
-    if o:IsA("BasePart")and o.Transparency<1 then return o.CFrame end
-    if o:IsA("Model")then 
-        for _,c in ipairs(o:GetChildren())do 
-            if c:IsA("BasePart")and c.Transparency<1 and c.Name~="HumanoidRootPart"then return c.CFrame end 
-        end 
-        local h=o:FindFirstChild("HumanoidRootPart")
-        if h and h:IsA("BasePart")then return h.CFrame end 
-        if o.PrimaryPart then return o.PrimaryPart.CFrame end
-    end
-    if fallback then return fallback end
+    if obj:IsA("Model")then
+        local p=obj.PrimaryPart or obj:FindFirstChild("HumanoidRootPart")or obj:FindFirstChildWhichIsA("BasePart")
+        return p and p.CFrame
+    elseif obj:IsA("BasePart")then return obj.CFrame
+    elseif obj:FindFirstChild("Handle")then return obj.Handle.CFrame end
     return nil
 end
 
 -- NOCLIP
-local function ENC(c)
-    if not c then return end 
+local function EnableNoClip(char)
+    if not char then return end
     pcall(function()
-        if NCLoop then NCLoop:Disconnect()end 
-        NCLoop=RSvc.Stepped:Connect(function()
-            if not getgenv().AutoSaber then 
-                if NCLoop then NCLoop:Disconnect()NCLoop=nil end 
-                return 
-            end 
-            pcall(function()
-                for _,v in pairs(c:GetDescendants())do 
-                    if v:IsA("BasePart")then v.CanCollide=false end 
-                end 
-            end)
+        if NCLoop then NCLoop:Disconnect()end
+        NCLoop = RSvc.Stepped:Connect(function()
+            if not getgenv().AutoSaber then if NCLoop then NCLoop:Disconnect()NCLoop=nil end return end
+            pcall(function()for _,v in pairs(char:GetDescendants())do if v:IsA("BasePart")then v.CanCollide=false v.Velocity=Vector3.new()v.RotVelocity=Vector3.new()end end end)
         end)
     end)
 end
 
-local function DNC()
-    if NCLoop then NCLoop:Disconnect()NCLoop=nil end 
-    pcall(function()
-        local c=Plr.Character 
-        if c then 
-            for _,v in pairs(c:GetDescendants())do 
-                if v:IsA("BasePart")and v.Name~="HumanoidRootPart"then v.CanCollide=true end 
-            end 
-        end 
-    end)
+local function DisableNoClip()
+    if NCLoop then NCLoop:Disconnect()NCLoop=nil end
+    pcall(function()local c=Plr.Character if c then for _,v in pairs(c:GetDescendants())do if v:IsA("BasePart")and v.Name~="HumanoidRootPart"then v.CanCollide=true end end end end)
 end
 
--- STATUS UPDATE
+-- ATUALIZAR STATUS
 local function US()
     pcall(function()
-        SS.H=HS()
-        SS.T=CI("Torch")
-        SS.C=CI("Cup")
-        SS.R=CI("Relic")
+        SS.H=HS()SS.T=CI("Torch")SS.C=CI("Cup")
         local co=Plr.Backpack:FindFirstChild("Cup")or(Plr.Character and Plr.Character:FindFirstChild("Cup"))
-        SS.CF=false
-        if co and co:FindFirstChild("Handle")then
-            local c=co.Handle.Color 
-            SS.CF=c.R>0.8 and c.G<0.3 and c.B<0.3
-        end
-        local j=WS.Map:FindFirstChild("Jungle")
-        SS.SM=false
-        if j and j:FindFirstChild("QuestPlates")then 
-            local d=j.QuestPlates:FindFirstChild("Door")
-            SS.SM=d and d.CanCollide==false 
-        end
-        SS.B=false
-        if j and j:FindFirstChild("Final")then 
-            local p=j.Final:FindFirstChild("Part")
-            SS.B=p and p.Transparency==1 
-        end
+        if co and co:FindFirstChild("Handle")then local c=co.Handle.Color SS.CF=(c.R>0.9 and c.G<0.1 and c.B<0.1)else SS.CF=false end
+        if WS.Map:FindFirstChild("Jungle")and WS.Map.Jungle:FindFirstChild("QuestPlates")then
+            local d=WS.Map.Jungle.QuestPlates:FindFirstChild("Door")SS.SM=d and d.CanCollide==false else SS.SM=false end
+        if WS.Map:FindFirstChild("Jungle")and WS.Map.Jungle:FindFirstChild("Final")then
+            local p=WS.Map.Jungle.Final:FindFirstChild("Part")SS.B=p and p.Transparency==1 else SS.B=false end
         SS.RM=Plr.Character and Plr.Character:FindFirstChild("RichSight")~=nil
-        SS.ML=not WS.Enemies:FindFirstChild("Saber Expert")
-        local ds=WS.Map:FindFirstChild("Desert")
-        SS.D=false
-        if ds and ds:FindFirstChild("Burn")then 
-            local dp=ds.Burn:FindFirstChild("Part")
-            SS.D=dp and dp.Transparency==1 
-        end
+        SS.ML=not WS.Enemies:FindFirstChild("Saber Expert")SS.R=CI("Relic")
+        if WS.Map:FindFirstChild("Desert")and WS.Map.Desert:FindFirstChild("Burn")then
+            local dp=WS.Map.Desert.Burn:FindFirstChild("Part")SS.D=dp and dp.Transparency==1 else SS.D=false end
     end)
 end
 
--- TWEEN COM PROTEÇÃO
+-- TWEEN
 local function ST(tCF,spd)
     if not getgenv().AutoSaber or not tCF then return false end
-    
-    -- Verificar se já está na mesma posição
-    if LastPos and (LastPos.Position-tCF.Position).Magnitude<5 then
-        print("[AS] Já está nesta posição, pulando...")
-        return true
-    end
-    
-    local c=Plr.Character
-    local hrp=c and c:FindFirstChild("HumanoidRootPart")
+    local c=Plr.Character local hrp=c and c:FindFirstChild("HumanoidRootPart")
     local hum=c and c:FindFirstChild("Humanoid")
     if not hrp or not hum then return false end
-    
     local dst=(hrp.Position-tCF.Position).Magnitude
-    print("[AS] Distância para destino:",math.floor(dst))
-    
-    if dst<8 then 
-        LastPos=tCF
-        return true 
-    end
-    
-    if TweenActive then Stop()end
-    spd=spd or 300
-    local tm=math.max(dst/spd,0.5)
-    ENC(c)
-    hrp.Anchored=false
+    if dst<5 then return true end
+    Stop()spd=spd or 300 local tm=math.max(dst/spd,0.1)
+    EnableNoClip(c)hrp.Anchored=false hrp.AssemblyLinearVelocity=Vector3.new()
     if hum then hum:ChangeState(Enum.HumanoidStateType.RunningNoPhysics)end
-    ATw=TS:Create(hrp,TweenInfo.new(tm,Enum.EasingStyle.Linear),{CFrame=tCF})
-    TweenActive=true
-    local cmp=false
-    ATw.Completed:Connect(function()cmp=true TweenActive=false end)
-    ATw:Play()
-    local w=0 
-    while not cmp and w<tm+5 and getgenv().AutoSaber do 
-        task.wait(0.2)
-        w=w+0.2
-        if hrp and hrp.Parent then
-            local d=(hrp.Position-tCF.Position).Magnitude
-            if d<8 then break end
-        else
-            break
-        end
-    end
-    Stop()
-    if hrp and hrp.Parent then hrp.Anchored=false end
-    task.wait(0.3)
-    local arrived=hrp and hrp.Parent and(hrp.Position-tCF.Position).Magnitude<12
-    if arrived then LastPos=tCF end
-    return arrived
-end
-
--- CLICK/PROX
-local function CO(p)
-    if not p then return end 
-    pcall(function()
-        local cd=p:FindFirstChildOfClass("ClickDetector")
-        if cd then fireclickdetector(cd)end
+    local ti=TweenInfo.new(tm,Enum.EasingStyle.Linear,Enum.EasingDirection.InOut)
+    ATw=TS:Create(hrp,ti,{CFrame=tCF})
+    AHB=RSvc.Heartbeat:Connect(function()
+        if not getgenv().AutoSaber or not hrp or not hrp.Parent then Stop()return end
+        pcall(function()hrp.AssemblyLinearVelocity=Vector3.new()for _,v in pairs(c:GetDescendants())do if v:IsA("BasePart")then v.CanCollide=false end end end)
     end)
+    ATw:Play()local cmp=false ATw.Completed:Connect(function()cmp=true end)
+    local w=0 while not cmp and w<tm+2 and getgenv().AutoSaber do task.wait(0.1)w=w+0.1 end
+    Stop()if hrp and hrp.Parent then hrp.Anchored=false hrp.AssemblyLinearVelocity=Vector3.new()end
+    task.wait(0.3)return getgenv().AutoSaber
 end
 
-local function PO(o)
-    if not o then return end 
-    pcall(function()
-        local pp=o:FindFirstChildOfClass("ProximityPrompt")
-        if pp then fireproximityprompt(pp,5)end
-    end)
-end
+-- CLICK/PROXIMITY
+local function ClickObj(p)if not p then return false end pcall(function()local cd=p:FindFirstChildOfClass("ClickDetector")if cd then fireclickdetector(cd)end end)return true end
+local function ProxObj(o)if not o then return false end pcall(function()local pp=o:FindFirstChildOfClass("ProximityPrompt")if pp then fireproximityprompt(pp,5)end end)return true end
 
--- INTERACT COM VERIFICAÇÃO MELHORADA
-local function INT(pd,useFP,att)
-    att=att or 15
-    US()
-    
-    -- Verificar se já completou
-    if pd.id=="T"and SS.T then print("[AS] Já tem Torch")return true end
-    if pd.id=="C"and SS.C then print("[AS] Já tem Cup")return true end
-    if pd.id=="CF"and SS.CF then print("[AS] Cup já com fogo")return true end
-    if pd.id=="R"and SS.R then print("[AS] Já tem Relic")return true end
-    if pd.id=="SM"and SS.SM then print("[AS] Sick Man completo")return true end
-    
-    print("[AS] Interagindo com:",pd.id)
-    
-    local cf=GetCF(pd.p,pd.pos)
-    if not cf then 
-        print("[AS] ERRO: Não encontrou objeto nem posição fallback")
-        return false 
-    end
-    
-    if not ST(cf,300)then 
-        print("[AS] ERRO: Falha ao chegar")
-        return false 
-    end
-    
-    task.wait(0.5)
-    local suc=false
+-- INTERAGIR COM OBJETO
+local function Interact(path,useFP,attempts)
+    attempts=attempts or 12
+    local cf=GetCF(path)if not cf then print("[Auto Saber] Objeto não encontrado:",table.concat(path,"/"))return false end
+    if not ST(cf,300)then return false end task.wait(0.5)
+    local success=false
     pcall(function()
-        local o=WS 
-        for _,k in ipairs(pd.p)do 
-            o=o:FindFirstChild(k)
-            if not o then 
-                print("[AS] Objeto não encontrado, tentando clicar na posição")
-                return 
-            end 
-        end
-        local t=o:FindFirstChild("Handle")or o
-        local hrp=Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-        ENC(Plr.Character)
-        for i=1,att do
+        local obj=WS for _,k in ipairs(path)do obj=obj:FindFirstChild(k)if not obj then return end end
+        local target=obj:FindFirstChild("Handle")or obj
+        local hrp=Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")if not hrp then return end
+        EnableNoClip(Plr.Character)
+        for i=1,attempts do 
             if not getgenv().AutoSaber then break end
-            hrp.CFrame=t.CFrame 
-            task.wait(0.2)
-            if useFP then PO(t)else CO(t)end
-            task.wait(0.4)
-            US()
-            if pd.id=="T"and SS.T or pd.id=="C"and SS.C or pd.id=="CF"and SS.CF or pd.id=="SM"and SS.SM or pd.id=="R"and SS.R then 
-                suc=true 
-                print("[AS] Sucesso!")
-                break 
+            hrp.CFrame=target.CFrame task.wait(0.2)
+            if useFP then ProxObj(target)else ClickObj(target)end
+            task.wait(0.3)US()
+            -- Verifica se completou baseado no path
+            if path==PATHS.Torch and SS.T then success=true break end
+            if path==PATHS.Cup and SS.C then success=true break end
+            if path==PATHS.Lava and SS.CF then success=true break end
+            if path==PATHS.SickMan and SS.SM then success=true break end
+            if path==PATHS.Relic and SS.R then success=true break end
+        end
+    end)
+    DisableNoClip()task.wait(1)US()return success
+end
+
+-- ATIVAR BOTÕES
+local function AB()
+    if SS.B then return true end if not getgenv().AutoSaber then return false end
+    local finalObj=nil pcall(function()local j=WS.Map:FindFirstChild("Jungle")if j then finalObj=j:FindFirstChild("Final")end end)
+    if not finalObj then print("[Auto Saber] Jungle/Final não encontrado!")return false end
+    local firstButton=nil
+    for _,o in ipairs(finalObj:GetDescendants())do if o:IsA("Part")and o.Name=="Part"and o.Transparency<1 then firstButton=o break end end
+    if not firstButton then return false end
+    if not ST(firstButton.CFrame+Vector3.new(0,5,0),300)then return false end task.wait(0.5)
+    pcall(function()
+        local hrp=Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")if not hrp then return end
+        EnableNoClip(Plr.Character)
+        for _,o in ipairs(finalObj:GetDescendants())do
+            if not getgenv().AutoSaber then break end
+            if o:IsA("Part")and o.Name=="Part"and o.Transparency<1 then
+                for i=1,5 do if not getgenv().AutoSaber then break end
+                    hrp.CFrame=o.CFrame+Vector3.new(0,3,0)task.wait(0.3)ClickObj(o)task.wait(0.3)US()if SS.B then break end
+                end if SS.B then break end
             end
         end
     end)
-    DNC()
-    task.wait(1)
-    US()
-    return suc
+    DisableNoClip()task.wait(1)US()return SS.B
 end
 
--- ATIVAR BOTÕES MELHORADO
-local function AB()
-    if SS.B then return true end
+-- PEGAR TOCHA (vai pra Jungle)
+local function GT()
+    if SS.T then return true end 
     if not getgenv().AutoSaber then return false end
-    
-    print("[AS] Ativando botões da Jungle...")
-    
-    local fo=nil 
-    pcall(function()
-        local j=WS.Map:FindFirstChild("Jungle")
-        if j then fo=j:FindFirstChild("Final")end 
-    end)
-    if not fo then 
-        print("[AS] ERRO: Jungle/Final não encontrado")
-        return false 
-    end
-    
-    local buttons={}
-    for _,o in ipairs(fo:GetDescendants())do 
-        if o:IsA("Part")and o.Name=="Part"and o.Transparency<1 then 
-            table.insert(buttons,o)
-        end 
-    end
-    
-    if #buttons==0 then 
-        print("[AS] ERRO: Nenhum botão encontrado")
-        return false 
-    end
-    
-    print("[AS] Encontrados",#buttons,"botões")
-    
-    -- Ir para área dos botões
-    local startPos=buttons[1].CFrame+Vector3.new(0,5,0)
-    if not ST(startPos,300)then 
-        print("[AS] Não conseguiu chegar nos botões")
-        return false 
-    end
-    
-    task.wait(0.5)
-    pcall(function()
-        local hrp=Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-        ENC(Plr.Character)
-        for idx,btn in ipairs(buttons)do
-            if not getgenv().AutoSaber then break end
-            print("[AS] Clicando botão",idx,"/",#buttons)
-            for i=1,8 do 
-                if not getgenv().AutoSaber then break end
-                hrp.CFrame=btn.CFrame+Vector3.new(0,3,0)
-                task.wait(0.2)
-                CO(btn)
-                task.wait(0.3)
-                US()
-                if SS.B then 
-                    print("[AS] Todos botões ativados!")
-                    break 
-                end
-            end 
-            if SS.B then break end
-        end
-    end)
-    DNC()
-    task.wait(1)
-    US()
-    return SS.B
+    print("[Auto Saber] Indo pegar Tocha na Jungle...")
+    return Interact(PATHS.Torch,true)
 end
 
--- QUESTS
-local function GT()if SS.T then return true end if not getgenv().AutoSaber then return false end return INT(P.T,true)end
-local function GC()if SS.C then return true end if not getgenv().AutoSaber then return false end return INT(P.C,false)end
-local function FC()if SS.CF then return true end if not getgenv().AutoSaber then return false end return INT(P.L,false)end
-local function TSM()if SS.SM then return true end if not getgenv().AutoSaber then return false end return INT(P.SM,false)end
-local function GR()if SS.R then return true end if not getgenv().AutoSaber then return false end return INT(P.R,false)end
+-- PEGAR CUP (vai pro Deserto)
+local function GC()
+    if SS.C then return true end 
+    if not getgenv().AutoSaber then return false end
+    print("[Auto Saber] Indo pegar Cup no Deserto...")
+    return Interact(PATHS.Cup,false)
+end
+
+-- ENCHER CUP (fica no Deserto)
+local function FC()
+    if SS.CF then return true end 
+    if not getgenv().AutoSaber then return false end
+    print("[Auto Saber] Enchendo Cup com Lava...")
+    return Interact(PATHS.Lava,false)
+end
+
+-- SICK MAN (volta pra Jungle)
+local function TSM()
+    if SS.SM then return true end 
+    if not getgenv().AutoSaber then return false end
+    print("[Auto Saber] Indo falar com Sick Man na Jungle...")
+    return Interact(PATHS.SickMan,false)
+end
 
 -- RICH MAN
 local function TRM()
-    if SS.RM then return true end 
-    if not getgenv().AutoSaber then return false end
-    print("[AS] Rich Man quest...")
-    local cf=GetCF(P.RM.p,P.RM.pos)
-    if not cf then return false end
-    if not ST(cf,300)then return false end 
-    task.wait(0.5)
+    if SS.RM then return true end if not getgenv().AutoSaber then return false end
+    print("[Auto Saber] Indo falar com Rich Man...")
+    local cf=GetCF(PATHS.RichMan)if not cf then return false end
+    if not ST(cf,300)then return false end task.wait(0.5)
     pcall(function()
-        local m=WS.Map:FindFirstChild("Mysterious Merchant")
-        if not m then return end
+        local m=WS.Map:FindFirstChild("Mysterious Merchant")if not m then return end
         local n=m:FindFirstChild("Mysterious Merchant")
         if not n or not n:FindFirstChild("HumanoidRootPart")then return end
-        local hrp=Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-        for i=1,15 do 
-            if not getgenv().AutoSaber then break end
-            hrp.CFrame=n.HumanoidRootPart.CFrame 
-            task.wait(0.3)
-            CO(n)
-            task.wait(0.5)
-            US()
-            if SS.RM then break end
+        local hrp=Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")if not hrp then return end
+        for i=1,12 do if not getgenv().AutoSaber then break end
+            hrp.CFrame=n.HumanoidRootPart.CFrame task.wait(0.3)ClickObj(n)task.wait(0.5)US()if SS.RM then break end
         end
     end)
-    task.wait(1.5)
-    US()
-    return SS.RM
+    task.wait(1.5)US()return SS.RM
 end
 
--- BOSS COM VERIFICAÇÃO
+-- DERROTAR BOSS
 local function DML()
-    if SS.ML then return true end 
-    if not getgenv().AutoSaber then return false end
-    print("[AS] Procurando boss...")
-    local bc=nil 
-    local attempts=0
-    while attempts<5 and not bc and getgenv().AutoSaber do
-        pcall(function()
-            local b=WS.Enemies:FindFirstChild("Saber Expert")
-            if b and b:FindFirstChild("HumanoidRootPart")then 
-                bc=b.HumanoidRootPart.CFrame 
-                print("[AS] Boss encontrado!")
-            end 
-        end)
-        if not bc then 
-            print("[AS] Boss não spawnou ainda, aguardando...")
-            task.wait(3)
-            attempts=attempts+1
+    if SS.ML then return true end if not getgenv().AutoSaber then return false end
+    print("[Auto Saber] Indo derrotar Saber Expert...")
+    -- Busca posição do boss dinamicamente
+    local bossCF=nil
+    pcall(function()
+        local boss=WS.Enemies:FindFirstChild("Saber Expert")
+        if boss and boss:FindFirstChild("HumanoidRootPart")then
+            bossCF=boss.HumanoidRootPart.CFrame
         end
-    end
-    if not bc then 
-        print("[AS] Boss não encontrado após 5 tentativas, pulando...")
-        return false 
-    end
-    ST(bc+Vector3.new(0,20,0),300)
-    task.wait(2)
+    end)
+    -- Se não encontrou, vai pra área aproximada
+    if not bossCF then bossCF=CFrame.new(-2950,123,5400)end
+    ST(bossCF+Vector3.new(0,20,0),300)task.wait(1)
     local mw,w=120,0
-    while getgenv().AutoSaber and w<mw do 
-        US()
-        if SS.ML then return true end
+    while getgenv().AutoSaber and w<mw do US()if SS.ML then return true end
         local m=WS.Enemies:FindFirstChild("Saber Expert")
-        if m then 
-            local h=m:FindFirstChild("Humanoid")
-            local r=m:FindFirstChild("HumanoidRootPart")
-            if h and r and h.Health>0 then 
-                local c=Plr.Character
-                local hrp=c and c:FindFirstChild("HumanoidRootPart")
-                if hrp then 
-                    repeat 
-                        if not getgenv().AutoSaber then break end
-                        pcall(function()
-                            if _G.Equip then _G.Equip()end
-                            if _G.AutoHaki then _G.AutoHaki()end
-                            ENC(c)
-                            hrp.CFrame=r.CFrame*CFrame.new(0,15,0)
-                        end)
-                        task.wait(0.1)
-                    until not m.Parent or h.Health<=0 or not getgenv().AutoSaber 
+        if m then local h=m:FindFirstChild("Humanoid")local r=m:FindFirstChild("HumanoidRootPart")
+            if h and r and h.Health>0 then local c=Plr.Character local hrp=c and c:FindFirstChild("HumanoidRootPart")
+                if hrp then repeat if not getgenv().AutoSaber then break end
+                    pcall(function()AutoHaki()Equip()EnableNoClip(c)hrp.AssemblyLinearVelocity=Vector3.new()hrp.CFrame=r.CFrame*CFrame.new(0,15,0)end)
+                    task.wait(0.1)until not m.Parent or h.Health<=0 or not getgenv().AutoSaber
                 end
             end
-        else
-            print("[AS] Boss morreu ou despawnou")
-            break
-        end
-        task.wait(1)
-        w=w+1
-    end
-    DNC()
-    US()
-    return SS.ML
+        end task.wait(1)w=w+1
+    end DisableNoClip()US()return SS.ML
 end
 
--- PORTA
+-- PEGAR RELIC (volta pra Jungle)
+local function GR()
+    if SS.R then return true end 
+    if not getgenv().AutoSaber then return false end
+    print("[Auto Saber] Indo pegar Relíquia na Jungle...")
+    return Interact(PATHS.Relic,false)
+end
+
+-- ABRIR PORTA (vai pro Deserto com Relíquia)
 local function OD()
     if SS.D then return true end 
     if not getgenv().AutoSaber then return false end
-    if not SS.R then 
-        print("[AS] Precisa da Relic primeiro!")
-        return false 
-    end
-    print("[AS] Abrindo porta...")
-    local cf=GetCF(P.DD.p,P.DD.pos)
-    if not cf then return false end
-    if not ST(cf,300)then return false end 
-    task.wait(0.5)
+    if not SS.R then print("[Auto Saber] ERRO: Tentando abrir porta sem Relíquia!")return false end
+    print("[Auto Saber] Indo abrir Porta no Deserto com Relíquia...")
+    local cf=GetCF(PATHS.DesertDoor)if not cf then print("[Auto Saber] Porta não encontrada!")return false end
+    if not ST(cf,300)then return false end task.wait(0.5)
     pcall(function()
-        local dr=WS.Map.Desert.Burn:FindFirstChild("Part")
-        if not dr then return end
-        local hrp=Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-        ENC(Plr.Character)
-        for i=1,15 do 
-            if not getgenv().AutoSaber then break end
-            hrp.CFrame=dr.CFrame 
-            task.wait(0.3)
-            CO(dr)
-            task.wait(0.5)
-            US()
-            if SS.D then break end
+        local dr=WS.Map.Desert.Burn:FindFirstChild("Part")if not dr then return end
+        local hrp=Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")if not hrp then return end
+        EnableNoClip(Plr.Character)
+        for i=1,12 do if not getgenv().AutoSaber then break end
+            hrp.CFrame=dr.CFrame task.wait(0.3)ClickObj(dr)task.wait(0.5)US()if SS.D then break end
         end
     end)
-    DNC()
-    task.wait(1.5)
-    US()
-    return SS.D
+    DisableNoClip()task.wait(1.5)US()return SS.D
 end
 
 -- COLETAR SABER
 local function CS()
     if not getgenv().AutoSaber then return false end
-    print("[AS] Coletando Saber...")
-    local cf=GetCF(P.FS.p,P.FS.pos)
-    if not cf then return false end
-    if not ST(cf,300)then return false end 
-    task.wait(1)
+    print("[Auto Saber] Coletando Saber final...")
+    local cf=GetCF(PATHS.FinalSaber)if not cf then print("[Auto Saber] Saber não encontrado!")return false end
+    if not ST(cf,300)then return false end task.wait(1)
     pcall(function()
         local sb=WS.Map.Desert.Burn:FindFirstChild("Saber")
         if not sb or not sb:FindFirstChild("Handle")then return end
-        local hrp=Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
-        if not hrp then return end
-        ENC(Plr.Character)
-        for i=1,30 do 
-            if not getgenv().AutoSaber then break end
-            hrp.CFrame=sb.Handle.CFrame 
-            task.wait(0.2)
-            US()
-            if SS.H then break end
+        local hrp=Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")if not hrp then return end
+        EnableNoClip(Plr.Character)
+        for i=1,25 do if not getgenv().AutoSaber then break end
+            hrp.CFrame=sb.Handle.CFrame task.wait(0.2)US()if SS.H then break end
         end
     end)
-    DNC()
-    task.wait(1)
-    US()
-    return SS.H
+    DisableNoClip()task.wait(1)US()return SS.H
 end
 
 -- PRÉ-REQUISITOS
-local function CP(s)
-    if s=="B"then return true end
+local function CanProceed(s)
+    if s=="B"then return true end 
     if s=="T"then return SS.B end
-    if s=="C"then return SS.B and SS.T end
+    if s=="C"then return SS.B and SS.T end 
     if s=="CF"then return SS.B and SS.T and SS.C end
     if s=="SM"then return SS.B and SS.T and SS.C and SS.CF end
     if s=="RM"then return SS.B and SS.T and SS.C and SS.CF and SS.SM end
@@ -1210,76 +679,47 @@ end
 -- UI
 local TabQI=Win:AddTab({Title="Quests & Itens",Icon="package"})
 TabQI:AddSection("Auto Saber Quest")
-TabQI:AddParagraph({Title="Status do Saber",Content="Sistema automático completo"})
+TabQI:AddParagraph({Title="Status do Saber",Content="Sistema automático de Quest do Saber"})
 local SL=TabQI:AddParagraph({Title="Progresso",Content="Aguardando ativação..."})
-local TG=TabQI:AddToggle("AutoSaber",{Title="Auto Saber",Description="Quest automática do Saber",Default=false})
+local TG=TabQI:AddToggle("AutoSaber",{Title="Auto Saber",Description="Completa a Quest do Saber automaticamente",Default=false})
 
 TG:OnChanged(function(v)
     getgenv().AutoSaber=v
-    if v then 
-        LastPos=nil
-        Fl:Notify({Title="Auto Saber",Content="Auto Saber ativado!",Duration=3})
-    else 
-        Stop()
-        DNC()
-        LastPos=nil
-        SL:SetDesc("⏸️ Pausado")
-        Fl:Notify({Title="Auto Saber",Content="Auto Saber desativado.",Duration=3})
-    end
+    if v then Fl:Notify({Title="Auto Saber",Content="Auto Saber ativado!",Duration=3})
+    else Stop()DisableNoClip()SL:SetDesc("⏸️ Auto Saber pausado")Fl:Notify({Title="Auto Saber",Content="Auto Saber desativado.",Duration=3})end
 end)
 
--- LOOP PRINCIPAL COM PROTEÇÃO
+-- LOOP PRINCIPAL
 task.spawn(function()
-    while task.wait(3)do 
-        if getgenv().AutoSaber then 
-            pcall(function()
-                US()
-                if SS.H then 
-                    getgenv().AutoSaber=false 
-                    TG:SetValue(false)
-                    DNC()
-                    LastPos=nil
-                    SL:SetDesc("✅ Saber obtido!")
-                    Fl:Notify({Title="Auto Saber",Content="✅ Quest completa!",Duration=5})
-                    return 
-                end
-                if not SS.B then 
-                    SL:SetDesc("🔘 [1/9] Botões...")
-                    if AB()then task.wait(2)end
-                elseif not SS.T and CP("T")then 
-                    SL:SetDesc("🔥 [2/9] Tocha...")
-                    if GT()then task.wait(2)end
-                elseif not SS.C and CP("C")then 
-                    SL:SetDesc("🍵 [3/9] Cup...")
-                    if GC()then task.wait(2)end
-                elseif not SS.CF and CP("CF")then 
-                    SL:SetDesc("🌋 [4/9] Cup/Fogo...")
-                    if FC()then task.wait(2)end
-                elseif not SS.SM and CP("SM")then 
-                    SL:SetDesc("💬 [5/9] Sick Man...")
-                    if TSM()then task.wait(2)end
-                elseif not SS.RM and CP("RM")then 
-                    SL:SetDesc("💰 [6/9] Rich Man...")
-                    if TRM()then task.wait(2)end
-                elseif not SS.ML and CP("ML")then 
-                    SL:SetDesc("⚔️ [7/9] Boss...")
-                    if DML()then task.wait(2)else task.wait(5)end
-                elseif not SS.R and CP("R")then 
-                    SL:SetDesc("📿 [8/9] Relíquia...")
-                    if GR()then task.wait(2)end
-                elseif not SS.D and CP("D")then 
-                    SL:SetDesc("🚪 [9/9] Porta...")
-                    if OD()then task.wait(2)end
-                elseif SS.D and SS.R then 
-                    SL:SetDesc("⚔️ [FINAL] Saber...")
-                    if CS()then task.wait(2)end
-                else 
-                    SL:SetDesc("⏳ Verificando...")
-                    print("[AS] Aguardando condições...")
-                end
-            end)
-        end 
-    end
+    while task.wait(2)do if getgenv().AutoSaber then pcall(function()US()
+        if SS.H then getgenv().AutoSaber=false TG:SetValue(false)DisableNoClip()
+            SL:SetDesc("✅ Saber obtido com sucesso!")Fl:Notify({Title="Auto Saber",Content="Saber obtido! Quest completa.",Duration=5})return end
+        
+        -- SEQUÊNCIA CORRETA COM VALIDAÇÃO DE PRÉ-REQUISITOS
+        if not SS.B then 
+            SL:SetDesc("🔘 [1/9] Ativando botões na Jungle...")AB()
+        elseif not SS.T and CanProceed("T")then 
+            SL:SetDesc("🔥 [2/9] Pegando Tocha (Jungle → Item)...")GT()
+        elseif not SS.C and CanProceed("C")then 
+            SL:SetDesc("🍵 [3/9] Pegando Cup (Tocha → Deserto)...")GC()
+        elseif not SS.CF and CanProceed("CF")then 
+            SL:SetDesc("🌋 [4/9] Enchendo Cup com Lava (Deserto)...")FC()
+        elseif not SS.SM and CanProceed("SM")then 
+            SL:SetDesc("💬 [5/9] Falando com Sick Man (Cup → Jungle)...")TSM()
+        elseif not SS.RM and CanProceed("RM")then 
+            SL:SetDesc("💰 [6/9] Falando com Rich Man...")TRM()
+        elseif not SS.ML and CanProceed("ML")then 
+            SL:SetDesc("⚔️ [7/9] Derrotando Saber Expert...")DML()
+        elseif not SS.R and CanProceed("R")then 
+            SL:SetDesc("📿 [8/9] Coletando Relíquia (Jungle)...")GR()
+        elseif not SS.D and CanProceed("D")then 
+            SL:SetDesc("🚪 [9/9] Abrindo Porta (Relíquia → Deserto)...")OD()
+        elseif SS.D and SS.R then 
+            SL:SetDesc("⚔️ [FINAL] Coletando Saber (Deserto)...")CS()
+        else 
+            SL:SetDesc("⏳ Aguardando conclusão de etapa anterior...")task.wait(2)
+        end
+    end)end end
 end)
 -- ============================
 -- MÓDULO AUTO SEA 2 - NEXUS HUB V3
@@ -1290,94 +730,17 @@ getgenv().AutoSea2 = false
 local QuestStep = 1
 local BossDefeated = false
 
+-- Função de Notificação
 local function Notify(text)
     Fl:Notify({Title="Auto Sea 2", Content=text, Duration=5})
 end
 
--- Verificar se Boss está vivo/spawned
-local function IsBossAlive()
-    local alive = false
-    pcall(function()
-        local boss = WS.Enemies:FindFirstChild("Ice Admiral")
-        if boss then
-            local humanoid = boss:FindFirstChild("Humanoid")
-            if humanoid and humanoid.Health > 0 then
-                alive = true
-            end
-        end
-    end)
-    return alive
-end
-
--- Verificar se a porta já está aberta
-local function IsDoorOpen()
-    local isOpen = false
-    pcall(function()
-        local door = WS.Map:FindFirstChild("Ice")
-        if door then door = door:FindFirstChild("Door") end
-        
-        if door then
-            isOpen = door.Transparency == 1 or not door.CanCollide
-        end
-    end)
-    return isOpen
-end
-
--- Verificar se Boss já foi derrotado ou não existe mais
-local function CheckBossStatus()
-    return not IsBossAlive()
-end
-
--- Sistema de verificação de progresso ao iniciar
-local BossNotifiedOnce = false
-
-local function VerifyProgress()
-    pcall(function()
-        -- Se a porta já está aberta
-        if IsDoorOpen() then
-            print("[Auto Sea 2] Porta já está aberta!")
-            
-            -- Verifica se o boss está vivo
-            if IsBossAlive() then
-                print("[Auto Sea 2] Boss está vivo! Indo direto para ele...")
-                QuestStep = 3  -- Vai direto para derrotar o boss
-                Notify("⏭️ Porta aberta detectada! Indo pro boss...")
-            elseif CheckBossStatus() then
-                -- Boss não existe/morto
-                if not BossNotifiedOnce then
-                    Notify("⚠️ Boss não está spawnado! Aguardando...")
-                    BossNotifiedOnce = true
-                end
-                print("[Auto Sea 2] Boss não spawnou ainda, aguardando...")
-                QuestStep = 3  -- Fica no step 3 esperando boss spawnar
-            end
-        -- Se não tem chave mas porta fechada
-        elseif not HasKey() then
-            QuestStep = 1
-            print("[Auto Sea 2] Iniciando do zero...")
-        -- Se tem chave mas porta fechada
-        elseif HasKey() then
-            QuestStep = 2
-            Notify("⏭️ Chave detectada! Indo abrir a porta...")
-            print("[Auto Sea 2] Chave encontrada, indo para a porta...")
-        end
-    end)
-end
-
+-- Verificar Level
 local function CheckLevel()
-    local level = 0
-    pcall(function()
-        if Plr:FindFirstChild("Data") and Plr.Data:FindFirstChild("Level") then
-            level = Plr.Data.Level.Value
-        elseif Plr:FindFirstChild("Level") then
-            level = Plr.Level.Value
-        elseif Plr:FindFirstChild("leaderstats") and Plr.leaderstats:FindFirstChild("Level") then
-            level = Plr.leaderstats.Level.Value
-        end
-    end)
-    return level >= 700
+    return Plr.Level.Value >= 700
 end
 
+-- Verificar se tem a chave
 local function HasKey()
     local ok, r = pcall(function()
         return Plr.Backpack:FindFirstChild("Key") or (Plr.Character and Plr.Character:FindFirstChild("Key"))
@@ -1385,160 +748,110 @@ local function HasKey()
     return ok and r ~= nil
 end
 
--- Tween com Heartbeat suave (300 speed)
-local function SmoothTween(targetCF)
-    if not getgenv().AutoSea2 or not targetCF then return false end
-    
+-- Tween suave com Heartbeat
+local function TweenTo(targetCF, speed)
+    speed = speed or 300
     local Character = Plr.Character
     if not Character then return false end
     
     local HRP = Character:FindFirstChild("HumanoidRootPart")
-    local Hum = Character:FindFirstChild("Humanoid")
-    if not HRP or not Hum then return false end
+    if not HRP then return false end
     
     local distance = (HRP.Position - targetCF.Position).Magnitude
-    if distance < 5 then return true end
-    
-    local speed = 300
     local duration = distance / speed
     
     local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut)
     local tween = TS:Create(HRP, tweenInfo, {CFrame = targetCF})
     
-    -- NoClip com Heartbeat suave
+    -- NoClip durante movimento
     local connection
     connection = RSvc.Heartbeat:Connect(function()
         if not getgenv().AutoSea2 then
-            if connection then connection:Disconnect() end
+            connection:Disconnect()
             return
         end
-        pcall(function()
-            HRP.AssemblyLinearVelocity = Vector3.new()
-            for _, v in pairs(Character:GetDescendants()) do
-                if v:IsA("BasePart") then
-                    v.CanCollide = false
-                end
+        for _, v in pairs(Character:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = false
             end
-        end)
+        end
     end)
     
     tween:Play()
     tween.Completed:Wait()
     
     if connection then connection:Disconnect() end
-    task.wait(0.3)
+    task.wait(0.5)
     return getgenv().AutoSea2
 end
 
--- Interagir com NPC (Tween suave + Conversa automática SEM abrir diálogo + FIXO na frente)
+-- Interagir com NPC
 local function TalkToNPC(npcName, position)
-    if not SmoothTween(position) then return false end
+    if not TweenTo(position, 300) then return false end
     
-    local success = false
-    for i = 1, 8 do  -- Reduzido de 15 para 8 tentativas
-        if not getgenv().AutoSea2 then break end
-        
-        pcall(function()
-            local npc = WS.NPCs:FindFirstChild(npcName)
-            if npc and npc:FindFirstChild("HumanoidRootPart") then
-                local HRP = Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
-                if HRP then
-                    -- Fica FIXO na frente do NPC (não fica indo pra trás)
-                    local npcCF = npc.HumanoidRootPart.CFrame
-                    local frontPosition = npcCF * CFrame.new(0, 0, -3)
-                    HRP.CFrame = frontPosition
-                    task.wait(0.1)
-                    
-                    -- Interage automaticamente SEM abrir caixas de diálogo
-                    if CF then
-                        -- Fecha qualquer diálogo aberto
-                        pcall(function()
-                            local gui = Plr.PlayerGui:FindFirstChild("Main")
-                            if gui then
-                                local dialog = gui:FindFirstChild("DialogueContainer")
-                                if dialog then
-                                    dialog.Visible = false
-                                end
-                            end
-                        end)
-                        
-                        -- Invoca servidor para conversar automaticamente
-                        CF:InvokeServer("StartQuest")
-                        CF:InvokeServer("ProQuestProgress", "Mission")
-                    end
-                    
-                    -- ClickDetector como backup
+    local attempts = 0
+    while attempts < 15 and getgenv().AutoSea2 do
+        local npc = WS.NPCs:FindFirstChild(npcName)
+        if npc and npc:FindFirstChild("HumanoidRootPart") then
+            local HRP = Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
+            if HRP then
+                HRP.CFrame = npc.HumanoidRootPart.CFrame
+                task.wait(0.3)
+                
+                -- Click no NPC
+                pcall(function()
                     local clickDetector = npc:FindFirstChildOfClass("ClickDetector")
                     if clickDetector then
                         fireclickdetector(clickDetector)
                     end
-                    
-                    if npcName == "Military Detective" and HasKey() then
-                        success = true
-                    end
-                end
-            end
-        end)
-        
-        if success then break end
-        task.wait(1)  -- Reduzido de 0.3 para 1 segundo
-    end
-    
-    return success or HasKey()
-end
-
--- Equipar chave e abrir porta
-local function OpenDoor(doorPosition)
-    if not HasKey() then return false end
-    
-    -- Equipar chave
-    pcall(function()
-        local key = Plr.Backpack:FindFirstChild("Key")
-        if key and Plr.Character then
-            local humanoid = Plr.Character:FindFirstChild("Humanoid")
-            if humanoid then
-                humanoid:EquipTool(key)
+                end)
+                task.wait(0.5)
             end
         end
-    end)
+        attempts = attempts + 1
+        task.wait(0.5)
+    end
+    return true
+end
+
+-- Abrir porta com chave
+local function OpenDoor(doorPosition)
+    if not HasKey() then return false end
+    if not TweenTo(doorPosition, 300) then return false end
     
-    if not SmoothTween(doorPosition) then return false end
-    
-    for i = 1, 15 do
-        if not getgenv().AutoSea2 then break end
+    local attempts = 0
+    while attempts < 15 and getgenv().AutoSea2 do
+        local door = WS.Map:FindFirstChild("Ice")
+        if door then door = door:FindFirstChild("Door") end
         
-        pcall(function()
-            local door = WS.Map:FindFirstChild("Ice")
-            if door then door = door:FindFirstChild("Door") end
-            
-            if door then
-                local HRP = Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
-                if HRP then
-                    HRP.CFrame = door.CFrame
-                    task.wait(0.2)
-                    
+        if door then
+            local HRP = Plr.Character and Plr.Character:FindFirstChild("HumanoidRootPart")
+            if HRP then
+                HRP.CFrame = door.CFrame
+                task.wait(0.2)
+                
+                pcall(function()
                     local clickDetector = door:FindFirstChildOfClass("ClickDetector")
                     if clickDetector then
                         fireclickdetector(clickDetector)
                     end
-                end
+                end)
+                task.wait(0.3)
             end
-        end)
-        
-        task.wait(0.3)
+        end
+        attempts = attempts + 1
+        task.wait(0.5)
     end
-    
     return true
 end
 
--- Farm Boss usando RegisterHit e RegisterAttack do Nexus
+-- Farm Ice Admiral
 local function FarmBoss(spawnPosition)
-    if not SmoothTween(spawnPosition) then return false end
+    TweenTo(spawnPosition, 300)
     task.wait(1)
     
-    local maxTime = 180
+    local maxTime = 120
     local elapsed = 0
-    local bossNotifyShown = false
     
     while getgenv().AutoSea2 and elapsed < maxTime do
         local boss = WS.Enemies:FindFirstChild("Ice Admiral")
@@ -1546,76 +859,32 @@ local function FarmBoss(spawnPosition)
         if boss then
             local humanoid = boss:FindFirstChild("Humanoid")
             local bossHRP = boss:FindFirstChild("HumanoidRootPart")
-            local bossHead = boss:FindFirstChild("Head")
             
             if humanoid and bossHRP and humanoid.Health > 0 then
                 local Character = Plr.Character
                 local HRP = Character and Character:FindFirstChild("HumanoidRootPart")
                 
                 if HRP then
-                    -- Reset notificação quando boss spawnar
-                    if not bossNotifyShown then
-                        print("[Auto Sea 2] Boss detectado! Iniciando ataque...")
-                        bossNotifyShown = true
-                    end
-                    
-                    -- Heartbeat para manter fixo no ar (estilo Auto Farm Nexus)
-                    local farmConnection
-                    farmConnection = RSvc.Heartbeat:Connect(function()
-                        if not boss.Parent or humanoid.Health <= 0 or not getgenv().AutoSea2 then
-                            if farmConnection then farmConnection:Disconnect() end
-                            return
-                        end
+                    repeat
+                        if not getgenv().AutoSea2 then break end
                         
                         pcall(function()
-                            -- Ativa Haki e Equipa arma
                             AutoHaki()
                             Equip()
-                            
-                            -- Mantém fixo acima do boss
                             HRP.CFrame = bossHRP.CFrame * CFrame.new(0, 20, 15)
-                            HRP.AssemblyLinearVelocity = Vector3.new()
-                            
-                            -- NoClip
-                            for _, v in pairs(Character:GetDescendants()) do
-                                if v:IsA("BasePart") then
-                                    v.CanCollide = false
-                                end
-                            end
-                            
-                            -- Usa RegisterAttack e RegisterHit do Nexus
-                            if RA and RH and bossHead then
-                                local targets = {{boss, bossHead}}
-                                RA:FireServer(0.1)
-                                RH:FireServer(bossHead, targets)
-                            end
                         end)
-                    end)
-                    
-                    -- Aguarda boss morrer
-                    while boss.Parent and humanoid.Health > 0 and getgenv().AutoSea2 do
+                        
                         task.wait(0.1)
-                    end
+                    until not boss.Parent or humanoid.Health <= 0 or not getgenv().AutoSea2
                     
-                    if farmConnection then farmConnection:Disconnect() end
-                    
-                    if humanoid.Health <= 0 then
-                        BossDefeated = true
-                        return true
-                    end
+                    BossDefeated = true
+                    return true
                 end
-            end
-        else
-            -- Boss não existe ainda
-            if not BossNotifiedOnce then
-                Notify("⚠️ Boss não está spawnado! Aguardando...")
-                BossNotifiedOnce = true
-                print("[Auto Sea 2] Aguardando boss spawnar...")
             end
         end
         
-        task.wait(2)
-        elapsed = elapsed + 2
+        task.wait(1)
+        elapsed = elapsed + 1
     end
     
     return BossDefeated
@@ -1623,100 +892,58 @@ end
 
 -- Sequência da Quest
 local function StartSea2Quest()
-    if not getgenv().AutoSea2 then return end
-    
     if not CheckLevel() then
-        Notify("❌ Você precisa de Level 700+!")
+        Notify("Você precisa de Level 700+!")
         getgenv().AutoSea2 = false
-        Sea2Toggle:SetValue(false)
         return
     end
     
-    -- Verifica se porta já está aberta durante execução
-    if QuestStep <= 2 and IsDoorOpen() then
-        print("[Auto Sea 2] Porta aberta detectada! Pulando para boss...")
+    -- Passo 1: Military Detective (pegar chave)
+    if QuestStep == 1 and not HasKey() then
+        Notify("Indo ao Military Detective...")
+        TalkToNPC("Military Detective", CFrame.new(5084.8, 5.68, 743.2))
+        task.wait(3)
+        if HasKey() then
+            QuestStep = 2
+        end
+    end
+    
+    -- Passo 2: Abrir porta na Ice Cave
+    if QuestStep == 2 then
+        Notify("Indo para Ice Cave abrir a porta...")
+        OpenDoor(CFrame.new(1266.5, 9.0, -1245.1))
+        task.wait(2)
         QuestStep = 3
     end
     
-    -- Passo 1: Military Detective (APENAS se não tiver chave E porta fechada)
-    if QuestStep == 1 then
-        if not HasKey() and not IsDoorOpen() then
-            Notify("🔑 Indo ao Military Detective...")
-            if TalkToNPC("Military Detective", CFrame.new(5084.8, 5.68, 743.2)) then
-                Notify("✅ Chave obtida!")
-                task.wait(1)
-                QuestStep = 2
-            end
-        else
-            QuestStep = 2
-        end
-        return
-    end
-    
-    -- Passo 2: Abrir porta (APENAS se porta estiver fechada)
-    if QuestStep == 2 then
-        if IsDoorOpen() then
-            Notify("⏭️ Porta já está aberta! Indo pro boss...")
-            QuestStep = 3
-            return
-        end
-        
-        Notify("🚪 Abrindo porta na Ice Cave...")
-        if OpenDoor(CFrame.new(1266.5, 9.0, -1245.1)) then
-            Notify("✅ Porta aberta!")
-            task.wait(1)
-            QuestStep = 3
-        end
-        return
-    end
-    
     -- Passo 3: Derrotar Ice Admiral
-    if QuestStep == 3 then
-        -- Se boss já foi derrotado, pula
-        if CheckBossStatus() and BossDefeated then
-            QuestStep = 4
-            return
-        end
-        
-        Notify("⚔️ Indo para o Ice Admiral...")
+    if QuestStep == 3 and not BossDefeated then
+        Notify("Derrotando Ice Admiral...")
         if FarmBoss(CFrame.new(1316.7, 26.9, -1338.1)) then
-            Notify("✅ Boss derrotado!")
-            BossNotifiedOnce = false
-            task.wait(2)
             QuestStep = 4
         end
-        return
     end
     
     -- Passo 4: Retornar ao Military Detective
     if QuestStep == 4 then
-        Notify("🔙 Voltando ao Military Detective...")
-        if TalkToNPC("Military Detective", CFrame.new(5084.8, 5.68, 743.2)) then
-            task.wait(2)
-            QuestStep = 5
-        end
-        return
+        Notify("Retornando ao Military Detective...")
+        TalkToNPC("Military Detective", CFrame.new(5084.8, 5.68, 743.2))
+        task.wait(2)
+        QuestStep = 5
     end
     
-    -- Passo 5: Experienced Captain (CIDADE CENTRAL SEA 1)
+    -- Passo 5: Experienced Captain
     if QuestStep == 5 then
-        Notify("✅ Indo para Cidade Central finalizar...")
-        print("[Auto Sea 2] Indo para cidade central (Middle Town)...")
+        Notify("Finalizando com Experienced Captain...")
+        TalkToNPC("Experienced Captain", CFrame.new(-4914.8, 717.7, -2622.3))
+        task.wait(2)
         
-        -- POSIÇÃO CORRETA: Cidade Central (Middle Town) no Sea 1
-        local middleTownPos = CFrame.new(-4913.5, 717.7, -2622.8)
-        
-        if TalkToNPC("Experienced Captain", middleTownPos) then
-            task.wait(2)
-            Notify("🎉 Quest do Second Sea completa!")
-            getgenv().AutoSea2 = false
-            QuestStep = 6
-        end
-        return
+        Notify("Quest do Second Sea completa! ✅")
+        getgenv().AutoSea2 = false
     end
 end
 
--- TOGGLE
+-- TOGGLE (Cole após o Toggle do Auto Saber)
 local Sea2Toggle = TabQI:AddToggle("AutoSea2", {
     Title = "Auto Sea 2",
     Description = "lvl 700+",
@@ -1725,26 +952,23 @@ local Sea2Toggle = TabQI:AddToggle("AutoSea2", {
 
 Sea2Toggle:OnChanged(function(value)
     getgenv().AutoSea2 = value
+    
     if value then
         QuestStep = 1
         BossDefeated = false
-        BossNotifiedOnce = false
-        
-        -- Verifica o progresso ao ativar
-        VerifyProgress()
-        
-        Notify("✅ Auto Sea 2 ativado!")
-        print("[Auto Sea 2] Sistema iniciado! Step atual:", QuestStep)
+        Notify("Auto Sea 2 ativado!")
     else
-        Notify("⏸️ Auto Sea 2 desativado")
+        Notify("Auto Sea 2 desativado")
     end
 end)
 
 -- Loop Principal
 task.spawn(function()
-    while task.wait(1) do
+    while task.wait(2) do
         if getgenv().AutoSea2 then
-            pcall(StartSea2Quest)
+            pcall(function()
+                StartSea2Quest()
+            end)
         end
     end
 end)
