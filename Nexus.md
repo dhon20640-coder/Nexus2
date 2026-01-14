@@ -191,11 +191,45 @@ local function RR()if GF()<3000 or not CF then return false end;return pcall(fun
 local function FP()pcall(function()LT.GlobalShadows=false;LT.FogEnd=9e9;settings().Rendering.QualityLevel=Enum.QualityLevel.Level01;for _,v in ipairs(WS:GetDescendants())do if v:IsA("BasePart")or v:IsA("UnionOperation")or v:IsA("MeshPart")then v.Material=Enum.Material.Plastic;v.Reflectance=0 elseif v:IsA("Decal")or v:IsA("Texture")then v.Transparency=1 elseif v:IsA("ParticleEmitter")or v:IsA("Trail")then v.Lifetime=NumberRange.new(0)elseif v:IsA("Fire")or v:IsA("SpotLight")or v:IsA("Smoke")or v:IsA("Sparkles")then v.Enabled=false end end end)end
 local function UseSkills(target,key)pcall(function()local VIM=game:GetService("VirtualInputManager");VIM:SendKeyEvent(true,key,false,game);task.wait(0.05);VIM:SendKeyEvent(false,key,false,game)end)end
 
-local Stepped=RSvc.Stepped;local ActiveTween,FollowConn,GroundTween=nil,nil,nil
+local Stepped=RSvc.Stepped;local ActiveTween,FollowConn,GroundTween,HeartbeatConn=nil,nil,nil,nil
 local function StopFollow()if FollowConn then FollowConn:Disconnect();FollowConn=nil end;CurrentBringPosition=nil end
+local function StopHeartbeat()if HeartbeatConn then HeartbeatConn:Disconnect();HeartbeatConn=nil end end
 local function TweenFollow25(hrp,targetHRP,speed)if not hrp or not targetHRP then return end;speed=speed or 300;if ActiveTween then ActiveTween:Cancel();ActiveTween=nil end;StopFollow();local targetCF=targetHRP.CFrame*CFrame.new(0,25,0);local distance=(hrp.Position-targetCF.Position).Magnitude;ActiveTween=TS:Create(hrp,TweenInfo.new(math.max(distance/speed,0.05),Enum.EasingStyle.Linear),{CFrame=targetCF});ActiveTween:Play();ActiveTween.Completed:Once(function()FollowConn=Stepped:Connect(function()if not targetHRP or not targetHRP.Parent or not IsFarmActive()then StopFollow();return end;local c=Plr.Character;if not c then StopFollow();return end;local currentHRP=c:FindFirstChild("HumanoidRootPart");if not currentHRP then StopFollow();return end;local newCF=targetHRP.CFrame*CFrame.new(0,25,0);currentHRP.AssemblyLinearVelocity=Vector3.zero;currentHRP.CFrame=newCF;CurrentBringPosition=newCF*CFrame.new(0,-25,0)end)end)end
-local function TweenToGround(hrp,targetCF,speed)if not hrp then return end;speed=speed or 250;StopFollow();if GroundTween then GroundTween:Cancel();GroundTween=nil end;if ActiveTween then ActiveTween:Cancel();ActiveTween=nil end;GroundTween=TS:Create(hrp,TweenInfo.new(math.max((hrp.Position-targetCF.Position).Magnitude/speed,0.1),Enum.EasingStyle.Linear),{CFrame=targetCF});GroundTween:Play();GroundTween.Completed:Wait();GroundTween=nil end
-local function StopAllTweens()if ActiveTween then ActiveTween:Cancel();ActiveTween=nil end;StopFollow();if GroundTween then GroundTween:Cancel();GroundTween=nil end end
+
+local function TweenToGround(hrp,targetCF,speed)
+    if not hrp then return end
+    speed=speed or 250
+    StopFollow()
+    StopHeartbeat()
+    if GroundTween then GroundTween:Cancel();GroundTween=nil end
+    if ActiveTween then ActiveTween:Cancel();ActiveTween=nil end
+    
+    local distance=(hrp.Position-targetCF.Position).Magnitude
+    local duration=math.max(distance/speed,0.1)
+    
+    GroundTween=TS:Create(hrp,TweenInfo.new(duration,Enum.EasingStyle.Linear),{CFrame=targetCF})
+    GroundTween:Play()
+    
+    -- HEARTBEAT ANTI-TREMOR (NOVA ADIÇÃO)
+    HeartbeatConn=RSvc.Heartbeat:Connect(function()
+        if not hrp or not hrp.Parent then
+            StopHeartbeat()
+            return
+        end
+        hrp.Velocity=Vector3.new(0,0,0)
+    end)
+    
+    GroundTween.Completed:Wait()
+    StopHeartbeat()
+    GroundTween=nil
+end
+
+local function StopAllTweens()
+    if ActiveTween then ActiveTween:Cancel();ActiveTween=nil end
+    StopFollow()
+    StopHeartbeat()
+    if GroundTween then GroundTween:Cancel();GroundTween=nil end
+end
 
 local KataMobs={"Cookie Crafter","Cake Guard","Baking Staff","Head Baker","Cocoa Warrior"}
 local BoneMobs={"Reborn Skeleton","Living Zombie","Demonic Soul","Posessed Mummy","Peanut Scout"}
@@ -264,12 +298,14 @@ Fl:Notify({Title="Nexus Hub V3",Content="Carregado! Sea: "..GS().." | Lv: "..GL(
 -- ESP Manager & Fruits + Auto Collect Fruits (MÓDULO SEPARADO)
 local PS=game:GetService("Players");local WS=game:GetService("Workspace")
 local RS=game:GetService("ReplicatedStorage");local TweenService=game:GetService("TweenService")
-local CS=game:GetService("CollectionService")
+local CS=game:GetService("CollectionService");local StarterGui=game:GetService("StarterGui")
+local RunService=game:GetService("RunService")
 local Plr=PS.LocalPlayer
 
 if not Win or not Fl then return end
 
-local TabEF=Win:AddTab({Title="Stack Farming",Icon="scroll"})
+local TabESP=Win:AddTab({Title="ESP",Icon="eye"})
+local TabEF=Win:AddTab({Title="Stack Farming",Icon="apple"})
 
 local ESP_Player=false;local ESP_Fruit=false;local ESP_Island=false;local ESP_Chest=false
 local AutoRF=false;local AutoSF=false
@@ -501,22 +537,18 @@ local function UpdateESPChests()
     end
 end
 
--- Adiciona ESP na aba Status
-if TabSt then
-    TabSt:AddSection("ESP")
-    
-    TabSt:AddToggle("ESPPlayer",{Title="ESP Players",Default=false})
-    :OnChanged(function(v)ESP_Player=v;if not v then ClearESP()end end)
+-- Tab ESP (sem section headers)
+TabESP:AddToggle("ESPPlayer",{Title="ESP Players",Default=false})
+:OnChanged(function(v)ESP_Player=v;if not v then ClearESP()end end)
 
-    TabSt:AddToggle("ESPFruit",{Title="ESP Fruits",Default=false})
-    :OnChanged(function(v)ESP_Fruit=v;if not v then ClearESP()end end)
+TabESP:AddToggle("ESPFruit",{Title="ESP Fruits",Default=false})
+:OnChanged(function(v)ESP_Fruit=v;if not v then ClearESP()end end)
 
-    TabSt:AddToggle("ESPIsland",{Title="ESP Ilha",Default=false})
-    :OnChanged(function(v)ESP_Island=v;if not v then ClearESP()end end)
+TabESP:AddToggle("ESPIsland",{Title="ESP Ilha",Default=false})
+:OnChanged(function(v)ESP_Island=v;if not v then ClearESP()end end)
 
-    TabSt:AddToggle("ESPChest",{Title="ESP Chest",Default=false})
-    :OnChanged(function(v)ESP_Chest=v;if not v then ClearESP()end end)
-end
+TabESP:AddToggle("ESPChest",{Title="ESP Chest",Default=false})
+:OnChanged(function(v)ESP_Chest=v;if not v then ClearESP()end end)
 
 -- Tab Stack Farming
 TabEF:AddSection("Auto Fruits")
@@ -530,13 +562,148 @@ TabEF:AddToggle("ACF_MOD",{Title="Auto Collect Fruits",Default=false})
 TabEF:AddToggle("AutoStoreFruit",{Title="Auto Store Fruit",Default=false})
 :OnChanged(function(v)AutoSF=v end)
 
+-- ============================================================
+-- SISTEMA DE NOTIFICAÇÕES (NOVO)
+-- ============================================================
+_G.RemoveNotifications = false
+local NotifLoop = nil
+local NotifConnection = nil
+
+local function StartRemovingNotifications()
+    if NotifLoop then return end
+    
+    -- Remove notificações existentes imediatamente
+    pcall(function()
+        local PlayerGui = Plr:WaitForChild("PlayerGui")
+        for _, gui in pairs(PlayerGui:GetChildren()) do
+            if gui:IsA("ScreenGui") then
+                for _, child in pairs(gui:GetDescendants()) do
+                    if child.Name:find("Notification") or 
+                       child.Name:find("Notify") or
+                       child.Name:find("Alert") or
+                       (child:IsA("Frame") and child.Name:find("Popup")) then
+                        child:Destroy()
+                    end
+                end
+            end
+        end
+    end)
+    
+    -- Loop contínuo (backup)
+    NotifLoop = task.spawn(function()
+        while _G.RemoveNotifications do
+            task.wait(0.05)
+            pcall(function()
+                local PlayerGui = Plr:WaitForChild("PlayerGui")
+                for _, gui in pairs(PlayerGui:GetChildren()) do
+                    if gui:IsA("ScreenGui") then
+                        for _, child in pairs(gui:GetDescendants()) do
+                            if child.Name:find("Notification") or 
+                               child.Name:find("Notify") or
+                               child.Name:find("Alert") or
+                               (child:IsA("Frame") and child.Name:find("Popup")) then
+                                child:Destroy()
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    end)
+    
+    -- Monitora novas notificações sendo adicionadas (INSTANTÂNEO)
+    local PlayerGui = Plr:WaitForChild("PlayerGui")
+    NotifConnection = PlayerGui.DescendantAdded:Connect(function(child)
+        if not _G.RemoveNotifications then return end
+        task.wait()
+        pcall(function()
+            if child.Name:find("Notification") or 
+               child.Name:find("Notify") or
+               child.Name:find("Alert") or
+               (child:IsA("Frame") and child.Name:find("Popup")) then
+                child:Destroy()
+            end
+        end)
+    end)
+end
+
+local function StopRemovingNotifications()
+    if NotifLoop then
+        task.cancel(NotifLoop)
+        NotifLoop = nil
+    end
+    if NotifConnection then
+        NotifConnection:Disconnect()
+        NotifConnection = nil
+    end
+end
+
+-- ============================================================
+-- SISTEMA DE NOCLIP
+-- ============================================================
+local NoClipEnabled = false
+local NoClipConnection = nil
+
+local function EnableNoClip()
+    NoClipEnabled = true
+    if NoClipConnection then return end
+    
+    NoClipConnection = RunService.Stepped:Connect(function()
+        if not NoClipEnabled then return end
+        local char = Plr.Character
+        if not char then return end
+        
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end)
+end
+
+local function DisableNoClip()
+    NoClipEnabled = false
+    if NoClipConnection then
+        NoClipConnection:Disconnect()
+        NoClipConnection = nil
+    end
+    
+    -- Restaura colisão
+    local char = Plr.Character
+    if char then
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                part.CanCollide = true
+            end
+        end
+    end
+end
+
+-- ============================================================
 -- Adiciona os Toggles na aba Settings
+-- ============================================================
 if TabSe then
     TabSe:AddToggle("ABuso",{Title="Auto Active Buso",Default=false})
     :OnChanged(function(v)_G.BusoAuto=v end)
     
     TabSe:AddToggle("RemoveNotif",{Title="Remove Notifications",Default=false})
-    :OnChanged(function(v)_G.RemoveNotifications=v end)
+    :OnChanged(function(v)
+        _G.RemoveNotifications = v
+        if v then
+            StartRemovingNotifications()
+        else
+            StopRemovingNotifications()
+        end
+    end)
+    
+    TabSe:AddToggle("NoClip",{Title="NoClip",Default=false})
+    :OnChanged(function(v)
+        if v then
+            EnableNoClip()
+        else
+            DisableNoClip()
+        end
+    end)
 end
 
 -- loop geral (ESP + Auto Random)
@@ -596,71 +763,7 @@ spawn(function()
     end
 end)
 
--- Remove Notifications (só remove quando ativo)
-local NotifConnections = {}
-
-local function RemoveNotifications()
-    local PlayerGui = Plr:WaitForChild("PlayerGui")
-    for _, gui in pairs(PlayerGui:GetChildren()) do
-        if gui.Name:find("Notification") or gui.Name:find("Notifications") then
-            gui:Destroy()
-        end
-    end
-end
-
-local function StartRemovingNotifications()
-    if NotifConnections.Loop then return end
-    
-    -- Remove notificações existentes
-    RemoveNotifications()
-    
-    -- Loop para remover novas notificações
-    NotifConnections.Loop = task.spawn(function()
-        while _G.RemoveNotifications do
-            task.wait(0.1)
-            pcall(RemoveNotifications)
-        end
-    end)
-    
-    -- Monitora novas notificações sendo adicionadas
-    local PlayerGui = Plr:WaitForChild("PlayerGui")
-    NotifConnections.Added = PlayerGui.ChildAdded:Connect(function(gui)
-        if _G.RemoveNotifications then
-            if gui.Name:find("Notification") or gui.Name:find("Notifications") then
-                gui:Destroy()
-            end
-        end
-    end)
-end
-
-local function StopRemovingNotifications()
-    if NotifConnections.Loop then
-        task.cancel(NotifConnections.Loop)
-        NotifConnections.Loop = nil
-    end
-    
-    if NotifConnections.Added then
-        NotifConnections.Added:Disconnect()
-        NotifConnections.Added = nil
-    end
-end
-
-spawn(function()
-    while task.wait(0.5) do
-        pcall(function()
-            if _G.RemoveNotifications then
-                if not NotifConnections.Loop then
-                    StartRemovingNotifications()
-                end
-            else
-                StopRemovingNotifications()
-            end
-        end)
-    end
-end)
-
 -- Auto Collect Fruits (TWEEN + HEARTBEAT)
-local RunService=game:GetService("RunService")
 local activeTween=nil
 local heartbeatConn=nil
 
@@ -749,5 +852,240 @@ task.spawn(function()
             StopTweenAndHeartbeat()
             getgenv().AF,getgenv().AK,getgenv().AB=wasAF,wasAK,wasAB
         end)
+    end
+end)
+-- Módulo: Estilo de Luta e TTK
+-- Compatível com Nexus Hub V3
+
+local RS = game:GetService("ReplicatedStorage")
+local TS = game:GetService("TweenService")
+local RSvc = game:GetService("RunService")
+local Plr = game:GetService("Players").LocalPlayer
+
+-- Aguarda o CF estar disponível
+local Remotes = RS:WaitForChild("Remotes", 5)
+local CF = Remotes:FindFirstChild("CommF_")
+
+-- Configuração global para Auto Buy Legendary Sword
+getgenv().AutoBuyLegendarySword = false
+
+-- Sistema de Tween Anti-Tremor
+local activeTween = nil
+local heartbeatConn = nil
+
+local function StopTweenAndHeartbeat()
+    if activeTween then
+        activeTween:Cancel()
+        activeTween = nil
+    end
+    if heartbeatConn then
+        heartbeatConn:Disconnect()
+        heartbeatConn = nil
+    end
+end
+
+local function TweenToPosition(targetCFrame)
+    local char = Plr.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    StopTweenAndHeartbeat()
+
+    local distance = (hrp.Position - targetCFrame.Position).Magnitude
+    local speed = 250
+    local duration = distance / speed
+
+    activeTween = TS:Create(
+        hrp,
+        TweenInfo.new(duration, Enum.EasingStyle.Linear),
+        {CFrame = targetCFrame}
+    )
+    activeTween:Play()
+
+    heartbeatConn = RSvc.Heartbeat:Connect(function()
+        if not hrp or not hrp.Parent then
+            StopTweenAndHeartbeat()
+            return
+        end
+        hrp.Velocity = Vector3.new(0, 0, 0)
+    end)
+    
+    return activeTween
+end
+
+-- Posições dos NPCs de Fighting Styles (TODAS CORRETAS)
+local FightingStyleNPCs = {
+    ["Dark Step"] = CFrame.new(-983.6179809570312, 12.449996948242188, 3990.462890625),
+    ["Electro"] = CFrame.new(-5382.7822265625, 12.550003051757812, -2148.818115234375),
+    ["Fishman Karate"] = CFrame.new(61586.722, 18.9, 989.584),
+    ["Dragon Breath"] = CFrame.new(699.572, 186.99, 656.837),
+    ["Death Step"] = CFrame.new(6358.787, 296.661, -6766.079),
+    ["Electric Claw"] = CFrame.new(6358.787, 296.661, -6766.079),
+    ["Sharkman Karate"] = CFrame.new(-2602.152, 239.212, -10315.58),
+    ["Dragon Talon"] = CFrame.new(5666.225, 1211.307, 866.386),
+    ["Godhuman"] = CFrame.new(-13777.618, 334.652, -9879.684),
+    ["Sanguine Art"] = CFrame.new(-16515.053, 23.17, -193.006)
+}
+
+-- Função para comprar Fighting Style
+local function BuyFightingStyle(styleName, remoteCommand)
+    local npcPos = FightingStyleNPCs[styleName]
+    if not npcPos then return end
+    
+    local tween = TweenToPosition(npcPos)
+    if tween then
+        tween.Completed:Wait()
+        task.wait(0.5)
+        StopTweenAndHeartbeat()
+        
+        pcall(function()
+            remoteCommand()
+        end)
+    end
+end
+
+-- Função para comprar espadas lendárias
+local function BuyLegendarySword()
+    if not CF then return end
+    
+    local swords = {"Shisui", "Saddi", "Wando"}
+    
+    for _, sword in ipairs(swords) do
+        local hasSword = false
+        
+        pcall(function()
+            local backpack = Plr.Backpack
+            local character = Plr.Character
+            
+            if backpack:FindFirstChild(sword) or (character and character:FindFirstChild(sword)) then
+                hasSword = true
+            end
+        end)
+        
+        if not hasSword then
+            pcall(function()
+                CF:InvokeServer("BuyItem", "Legendary Sword Dealer", sword)
+            end)
+            task.wait(0.5)
+        end
+    end
+end
+
+-- Adiciona seção na aba Shop
+TabS:AddSection("Estilos de Lutas")
+
+-- Botões de Fighting Styles
+TabS:AddButton({
+    Title = "Buy Dark Step",
+    Callback = function()
+        BuyFightingStyle("Dark Step", function()
+            CF:InvokeServer("BuyBlackLeg")
+        end)
+    end
+})
+
+TabS:AddButton({
+    Title = "Buy Eletric",
+    Callback = function()
+        BuyFightingStyle("Electro", function()
+            CF:InvokeServer("BuyElectro")
+        end)
+    end
+})
+
+TabS:AddButton({
+    Title = "Buy Water Kung Fu",
+    Callback = function()
+        BuyFightingStyle("Fishman Karate", function()
+            CF:InvokeServer("BuyFishmanKarate")
+        end)
+    end
+})
+
+TabS:AddButton({
+    Title = "Buy Dragon Breath",
+    Callback = function()
+        BuyFightingStyle("Dragon Breath", function()
+            CF:InvokeServer("BlackbeardReward", "DragonClaw", "1")
+            CF:InvokeServer("BlackbeardReward", "DragonClaw", "2")
+        end)
+    end
+})
+
+TabS:AddButton({
+    Title = "Buy Death Step",
+    Callback = function()
+        BuyFightingStyle("Death Step", function()
+            CF:InvokeServer("BuyDeathStep")
+        end)
+    end
+})
+
+TabS:AddButton({
+    Title = "Buy Eletric Claw",
+    Callback = function()
+        BuyFightingStyle("Electric Claw", function()
+            CF:InvokeServer("BuyElectricClaw", "Start")
+            CF:InvokeServer("BuyElectricClaw")
+        end)
+    end
+})
+
+TabS:AddButton({
+    Title = "Buy Sharkman Karatê",
+    Callback = function()
+        BuyFightingStyle("Sharkman Karate", function()
+            CF:InvokeServer("BuySharkmanKarate", true)
+            CF:InvokeServer("BuySharkmanKarate")
+        end)
+    end
+})
+
+TabS:AddButton({
+    Title = "Buy Dragon Talon",
+    Callback = function()
+        BuyFightingStyle("Dragon Talon", function()
+            CF:InvokeServer("BuyDragonTalon", true)
+            CF:InvokeServer("BuyDragonTalon")
+        end)
+    end
+})
+
+TabS:AddButton({
+    Title = "Buy GodHuman",
+    Callback = function()
+        BuyFightingStyle("Godhuman", function()
+            CF:InvokeServer("BuyGodhuman", true)
+            CF:InvokeServer("BuyGodhuman")
+        end)
+    end
+})
+
+TabS:AddButton({
+    Title = "Buy Sanguine Art",
+    Callback = function()
+        BuyFightingStyle("Sanguine Art", function()
+            CF:InvokeServer("BuySanguineArt", true)
+            CF:InvokeServer("BuySanguineArt")
+        end)
+    end
+})
+
+-- Toggle Auto Buy Legendary Sword
+local TG_ABLS = TabS:AddToggle("AutoBuyLegSword", {
+    Title = "Auto Buy Legendary Sword",
+    Default = false
+})
+
+TG_ABLS:OnChanged(function(v)
+    getgenv().AutoBuyLegendarySword = v
+end)
+
+-- Loop para Auto Buy Legendary Sword
+task.spawn(function()
+    while task.wait(5) do
+        if getgenv().AutoBuyLegendarySword then
+            pcall(BuyLegendarySword)
+        end
     end
 end)
